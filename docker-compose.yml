@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: demo-concorrencia-pg
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+      POSTGRES_DB: banco
+    ports:
+      # 5433 no host para nao brigar com um Postgres ja instalado na maquina
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo -d banco"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    command:
+      - postgres
+      # os cenarios abrem varios pools ao mesmo tempo; o padrao de 100 aperta
+      - -c
+      - max_connections=300
+      # detecta o deadlock do cenario 09 rapido, para nao travar a apresentacao
+      - -c
+      - deadlock_timeout=200ms
+      - -c
+      - log_lock_waits=on
+
+volumes:
+  pgdata:

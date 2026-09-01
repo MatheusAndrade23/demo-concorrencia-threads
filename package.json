@@ -1,0 +1,45 @@
+{
+  "name": "demo-concorrencia-threads",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Projeto didatico: bugs de concorrencia com async/await e worker_threads",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:reset": "tsx src/db.ts --reset",
+    "typecheck": "tsc --noEmit",
+    "c01": "tsx src/cenarios/01-sequencial.ts",
+    "c02": "tsx src/cenarios/02-corrida-sem-thread.ts",
+    "c03": "tsx src/cenarios/03-promise-orfa.ts",
+    "c04": "tsx src/cenarios/04-event-loop-travado.ts",
+    "c05": "tsx src/cenarios/05-conexao-compartilhada.ts",
+    "c06": "tsx src/cenarios/06-worker-sab-corrida.ts",
+    "c07": "tsx src/cenarios/07-worker-cpu.ts",
+    "c08": "tsx src/cenarios/08-worker-banco.ts",
+    "c09": "tsx src/cenarios/09-deadlock.ts",
+    "c10": "tsx src/cenarios/10-leitura-suja.ts",
+    "c11": "tsx src/cenarios/11-heisenbug.ts",
+    "bench": "tsx src/benchmark.ts",
+    "graficos": "tsx src/graficos.ts"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vega": "^6.4.0",
+    "vega-cli": "^6.4.0",
+    "vega-lite": "^6.4.3"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
