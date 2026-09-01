@@ -38,7 +38,7 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
   const entradas: EntradaWorker<ParamsSab>[] = Array.from({ length: workers }, (_, id) => ({
     id,
     config: cfg,
-    params: { iteracoes },
+    params: { iteracoes, logNaSecaoCritica: opts.logNaSecaoCritica === true },
     sab,
   }));
 
