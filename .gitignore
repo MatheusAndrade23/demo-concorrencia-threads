@@ -1,9 +1,10 @@
 node_modules/
 dist/
 .env
-*.log
 .DS_Store
-resultados/*.csv
-resultados/*.svg
-resultados/*.png
-!resultados/.gitkeep
+
+# os resultados sao entregaveis e ficam versionados; o log bruto da execucao nao
+resultados/*.log
+
+# specs intermediarios do vega-lite; "npm run graficos" regenera a partir do CSV
+resultados/*.vl.json
