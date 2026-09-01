@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+resultados/*.csv
+resultados/*.svg
+resultados/*.png
+!resultados/.gitkeep
