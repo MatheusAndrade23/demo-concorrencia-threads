@@ -30,7 +30,7 @@ export function secao(texto: string): void {
 }
 
 function linha(rotulo: string, valor: string): void {
-  console.log('  ' + rotulo.padEnd(22) + valor);
+  console.log('  ' + rotulo.padEnd(34) + valor);
 }
 
 export function dinheiro(v: number): string {

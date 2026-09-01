@@ -73,6 +73,18 @@ export function criarPool(max = 10, cfg: Config = lerConfig()): Pool {
   });
 }
 
+/**
+ * Abre `n` conexoes e devolve todas ao pool.
+ *
+ * Sem isto, um cenario curto paga o handshake de N conexoes dentro da janela
+ * medida e o Pool aparece mais lento do que e. Higiene de medicao, nao correcao
+ * de bug: o warm-up nao muda em nada a corrida que os cenarios demonstram.
+ */
+export async function aquecerPool(pool: Pool, n: number): Promise<void> {
+  const clientes = await Promise.all(Array.from({ length: n }, () => pool.connect()));
+  for (const c of clientes) c.release();
+}
+
 /** Um Client solto, sem pool. Usado de proposito pelo cenario 05. */
 export function criarClient(cfg: Config = lerConfig()): pg.Client {
   return new pg.Client({
