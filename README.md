@@ -77,10 +77,39 @@ npm run c11 2>/dev/null
 
 ## Como rodar tudo
 
+Existem dois comandos, e eles servem para coisas diferentes.
+
+### Os 11 cenários na sequência, com a saída de apresentação
+
 ```bash
-npm run bench -- --cenarios todos --repeticoes 10
+npm run todos
+```
+
+Roda de 1 a 11 na ordem, cada um num processo separado, com a mesma saída que
+teriam se você os chamasse um a um. Leva cerca de 20 segundos no total e termina
+com uma tabela de tempo e status por cenário. É o comando para ensaiar a
+apresentação e para conferir que tudo funciona depois de um `git clone`.
+
+```bash
+npm run todos -- --so 02,06,11     # só estes, por prefixo
+npm run todos -- --bloco A         # só o bloco A (1 a 5)
+npm run todos -- --bloco B         # só o bloco B (6 a 11)
+npm run todos -- --parar-no-erro   # interrompe no primeiro que falhar
+npm run todos 2>/dev/null          # esconde o barulho de depuração do cenário 11
+```
+
+Por padrão ele segue mesmo se um cenário falhar, e lista as falhas no resumo do
+fim. O código de saída é 1 se algum cenário falhou.
+
+### A medição, com repetições e gráficos
+
+```bash
+caffeinate -i npm run bench -- --cenarios todos --repeticoes 10
 npm run graficos
 ```
+
+Este é o que gera os CSV e os SVG. Ao contrário do `npm run todos`, ele silencia
+a saída dos cenários e mede.
 
 Opções do runner:
 
@@ -319,6 +348,7 @@ src/workers/cpu-worker.ts
 src/workers/banco-worker.ts
 src/workers/deadlock-worker.ts
 src/workers/transferencia-worker.ts
+src/todos.ts                  roda os 11 cenários na sequência
 src/benchmark.ts
 src/graficos.ts
 resultados/                   CSV e SVG gerados

@@ -7,6 +7,14 @@ Os números citados são os medidos na máquina de desenvolvimento (10 núcleos,
 Postgres 17 em container local). Rode antes da apresentação e substitua pelos
 seus, porque bug de corrida não é determinístico e a plateia vai perguntar.
 
+O ensaio completo leva cerca de 20 segundos:
+
+```bash
+npm run db:up && npm run todos
+```
+
+Para ensaiar um bloco por vez: `npm run todos -- --bloco A`.
+
 ---
 
 ## Abertura
