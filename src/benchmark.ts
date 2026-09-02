@@ -1,8 +1,8 @@
 /**
  * Runner de benchmark.
  *
- *   npx tsx src/benchmark.ts --cenarios 02,08 --concorrencia 1,2,4,8,16,32,64 \
- *                            --repeticoes 10 --operacoes 200
+ *   npx tsx src/benchmark.ts --scenarios 02,08 --concurrency 1,2,4,8,16,32,64 \
+ *                            --repetitions 10 --operations 200
  *
  * Regras da medicao:
  *   - uma execucao de warm-up e descartada antes de cada serie
@@ -28,11 +28,11 @@ interface Definicao {
   carregar: () => Promise<Modulo>;
   /** concorrencias que fazem sentido para este cenario */
   concorrenciasPadrao: number[];
-  /** valor de `operacoes` quando --operacoes nao e passado */
+  /** valor de `operacoes` quando --operations nao e passado */
   operacoesPadrao: number;
   /**
    * true quando `operacoes` nao e "numero de saques" e sim outra escala
-   * (rodadas de hash, incrementos por worker). Estes ignoram --operacoes.
+   * (rodadas de hash, incrementos por worker). Estes ignoram --operations.
    */
   escalaPropria: boolean;
   valorSaque?: number;
@@ -162,7 +162,7 @@ function listaDeNumeros(bruto: string): number[] {
 
 function selecionarCenarios(bruto: string): Definicao[] {
   const chave = bruto.trim().toLowerCase();
-  if (chave === 'todos' || chave === 'all') return CENARIOS;
+  if (chave === 'all') return CENARIOS;
   if (chave === 'a') return CENARIOS.filter((c) => c.bloco === 'A');
   if (chave === 'b') return CENARIOS.filter((c) => c.bloco === 'B');
 
@@ -191,30 +191,30 @@ function lerArgumentos(argv: string[]): Argumentos {
     const chave = argv[i];
     const valor = argv[i + 1];
     switch (chave) {
-      case '--cenarios':
-        args.cenarios = selecionarCenarios(valor ?? 'todos');
+      case '--scenarios':
+        args.cenarios = selecionarCenarios(valor ?? 'all');
         i++;
         break;
-      case '--concorrencia':
+      case '--concurrency':
         args.concorrencia = listaDeNumeros(valor ?? '');
         i++;
         break;
-      case '--repeticoes':
+      case '--repetitions':
         args.repeticoes = Math.max(1, Number(valor ?? 10));
         i++;
         break;
-      case '--operacoes':
+      case '--operations':
         args.operacoes = Math.max(1, Number(valor ?? 200));
         i++;
         break;
-      case '--saida':
+      case '--output':
         args.saida = valor ?? 'resultados';
         i++;
         break;
-      case '--sem-warmup':
+      case '--no-warmup':
         args.warmup = false;
         break;
-      case '--ajuda':
+      case '--help':
       case '-h':
         console.log(AJUDA);
         process.exit(0);
@@ -233,14 +233,14 @@ function lerArgumentos(argv: string[]): Argumentos {
 const AJUDA = `
 Uso: npx tsx src/benchmark.ts [opcoes]
 
-  --cenarios LISTA      nomes separados por virgula, ou "todos", "A", "B"
-                        exemplos: 02  |  02,08  |  01,02,05  |  B
-  --concorrencia LISTA  ex: 1,2,4,8,16,32,64 (padrao: o que cada cenario define)
-  --repeticoes N        padrao 10, uma linha no CSV por repeticao
-  --operacoes N         numero de saques por repeticao; cenarios de CPU e de
-                        memoria ignoram, porque a escala deles e outra
-  --sem-warmup          nao descarta a primeira execucao de cada serie
-  --saida DIR           padrao: resultados
+  --scenarios LISTA    nomes separados por virgula, ou "all", "A", "B"
+                       exemplos: 02  |  02,08  |  01,02,05  |  B
+  --concurrency LISTA  ex: 1,2,4,8,16,32,64 (padrao: o que cada cenario define)
+  --repetitions N      padrao 10, uma linha no CSV por repeticao
+  --operations N       numero de saques por repeticao; cenarios de CPU e de
+                       memoria ignoram, porque a escala deles e outra
+  --no-warmup          nao descarta a primeira execucao de cada serie
+  --output DIR         padrao: resultados
 `;
 
 // ---------------------------------------------------------------------------
@@ -416,7 +416,7 @@ export async function rodar(args: Argumentos): Promise<void> {
   console.log(`  ${join(args.saida, 'distribuicao.csv')}        ${distribuicao.length - 1} linhas`);
   console.log(`  ${join(args.saida, 'serie-leitura-suja.csv')}  ${serie.length - 1} linhas`);
   if (falhas > 0) console.log(`\n  ${falhas} repeticoes falharam e estao marcadas com falhou=sim no CSV.`);
-  console.log('\n  Gere os graficos com:  npm run graficos\n');
+  console.log('\n  Gere os graficos com:  npm run charts\n');
 }
 
 if (ehPrincipal(import.meta.url)) {

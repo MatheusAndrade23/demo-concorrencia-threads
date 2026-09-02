@@ -1,10 +1,10 @@
 /**
  * Roda os 11 cenarios em sequencia, com a saida de apresentacao de cada um.
  *
- *   npm run todos                  todos, na ordem
- *   npm run todos -- --so 02,06    so os cenarios pedidos
- *   npm run todos -- --bloco A     so o bloco A (1 a 5) ou B (6 a 11)
- *   npm run todos -- --parar-no-erro
+ *   npm run all                     todos, na ordem
+ *   npm run all -- --only 02,06     so os cenarios pedidos
+ *   npm run all -- --block A        so o bloco A (1 a 5) ou B (6 a 11)
+ *   npm run all -- --fail-fast
  *
  * Cada cenario roda num processo separado, com stdio herdado, exatamente como
  * se voce tivesse chamado `npx tsx src/cenarios/02-corrida-sem-thread.ts` na
@@ -29,7 +29,7 @@ function blocoDe(arquivo: string): 'A' | 'B' {
 }
 
 interface Argumentos {
-  so?: string[];
+  apenas?: string[];
   bloco?: 'A' | 'B';
   pararNoErro: boolean;
 }
@@ -40,24 +40,24 @@ function lerArgumentos(argv: string[]): Argumentos {
     const chave = argv[i];
     const valor = argv[i + 1];
     switch (chave) {
-      case '--so':
-        args.so = (valor ?? '').split(',').map((p) => p.trim()).filter((p) => p !== '');
+      case '--only':
+        args.apenas = (valor ?? '').split(',').map((p) => p.trim()).filter((p) => p !== '');
         i++;
         break;
-      case '--bloco': {
+      case '--block': {
         const b = (valor ?? '').trim().toUpperCase();
         if (b !== 'A' && b !== 'B') {
-          console.error(`[ERRO] --bloco aceita A ou B, veio "${valor}".`);
+          console.error(`[ERRO] --block aceita A ou B, veio "${valor}".`);
           process.exit(1);
         }
         args.bloco = b;
         i++;
         break;
       }
-      case '--parar-no-erro':
+      case '--fail-fast':
         args.pararNoErro = true;
         break;
-      case '--ajuda':
+      case '--help':
       case '-h':
         console.log(AJUDA);
         process.exit(0);
@@ -73,12 +73,12 @@ function lerArgumentos(argv: string[]): Argumentos {
 }
 
 const AJUDA = `
-Uso: npm run todos -- [opcoes]
+Uso: npm run all -- [opcoes]
 
-  --so LISTA          so estes cenarios, por prefixo. ex: --so 02,06,11
-  --bloco A|B         so o bloco A (sem thread) ou B (worker_threads)
-  --parar-no-erro     interrompe no primeiro cenario que falhar
-                      (o padrao e seguir e reportar no resumo do fim)
+  --only LISTA    so estes cenarios, por prefixo. ex: --only 02,06,11
+  --block A|B     so o bloco A (sem thread) ou B (worker_threads)
+  --fail-fast     interrompe no primeiro cenario que falhar
+                  (o padrao e seguir e reportar no resumo do fim)
 `;
 
 interface Execucao {
@@ -95,8 +95,8 @@ let arquivos = readdirSync(PASTA)
   .sort();
 
 if (args.bloco !== undefined) arquivos = arquivos.filter((f) => blocoDe(f) === args.bloco);
-if (args.so !== undefined) {
-  const pedidos = args.so;
+if (args.apenas !== undefined) {
+  const pedidos = args.apenas;
   const filtrados = arquivos.filter((f) => pedidos.some((p) => f.startsWith(p)));
   const semCorrespondencia = pedidos.filter((p) => !arquivos.some((f) => f.startsWith(p)));
   if (semCorrespondencia.length > 0) {
@@ -126,7 +126,7 @@ console.log(`  ${cfg.contas} contas x ${cfg.saldoInicial} de saldo inicial`);
 console.log('');
 console.log('  O cenario 11 escreve os logs de depuracao em stderr, porque o barulho');
 console.log('  dele e o proprio experimento. Para ver so os resumos:');
-console.log('    npm run todos 2>/dev/null');
+console.log('    npm run all 2>/dev/null');
 
 const execucoes: Execucao[] = [];
 const inicioGeral = performance.now();
@@ -146,10 +146,10 @@ for (const [indice, arquivo] of arquivos.entries()) {
   if (codigo !== 0) {
     console.error(`\n  [FALHOU] ${nome} saiu com codigo ${codigo}.`);
     if (args.pararNoErro) {
-      console.error('  --parar-no-erro ligado, interrompendo aqui.\n');
+      console.error('  --fail-fast ligado, interrompendo aqui.\n');
       break;
     }
-    console.error('  Seguindo para o proximo. Use --parar-no-erro para interromper.\n');
+    console.error('  Seguindo para o proximo. Use --fail-fast para interromper.\n');
   }
 }
 
@@ -172,8 +172,8 @@ if (falhas.length > 0) {
 }
 console.log('');
 console.log('  Para medir com repeticoes e gerar os graficos:');
-console.log('    caffeinate -i npm run bench -- --cenarios todos --repeticoes 10');
-console.log('    npm run graficos');
+console.log('    caffeinate -i npm run bench -- --scenarios all --repetitions 10');
+console.log('    npm run charts');
 console.log('');
 
 process.exit(falhas.length > 0 ? 1 : 0);

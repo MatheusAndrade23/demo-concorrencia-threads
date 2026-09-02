@@ -1,7 +1,7 @@
 /**
  * Le os CSV de resultados/ e gera os graficos em SVG com o vega-lite CLI.
  *
- *   npm run graficos              (le resultados/, escreve resultados/*.svg)
+ *   npm run charts                (le resultados/, escreve resultados/*.svg)
  *
  * Nenhum grafico e inventado: se o CSV nao tiver dados para um deles, ele e
  * pulado com um aviso, em vez de sair um eixo vazio.
@@ -319,7 +319,7 @@ if (ehPrincipal(import.meta.url)) {
   titulo('GRAFICOS');
   if (!existsSync(join(SAIDA, 'resultados.csv'))) {
     console.error(`\n[ERRO] Nao achei ${join(SAIDA, 'resultados.csv')}.`);
-    console.error('       Rode o benchmark antes:  npm run bench -- --cenarios todos\n');
+    console.error('       Rode o benchmark antes:  npm run bench -- --scenarios all\n');
     process.exit(1);
   }
   const graficos = construirGraficos();
