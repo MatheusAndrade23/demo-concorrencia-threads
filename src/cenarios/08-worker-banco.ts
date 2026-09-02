@@ -1,16 +1,16 @@
 /**
- * CENARIO 08 - a mesma corrida, agora com paralelismo real   (Bloco B)
+ * CENÁRIO 08 - a mesma corrida, agora com paralelismo real   (Bloco B)
  *
- * N workers, cada um com o proprio Pool, fazendo saques read-modify-write na
- * mesma conta. E o cenario 02 com threads de verdade no lugar das promises.
+ * N workers, cada um com o próprio Pool, fazendo saques read-modify-write na
+ * mesma conta. E o cenário 02 com threads de verdade no lugar das promises.
  *
- * O ponto NAO e que fica pior. E que fica DIFERENTE. No cenario 02 uma thread so
- * intercalava as promises nos pontos de await, entao a perda seguia o ritmo do
- * event loop. Aqui os nucleos escrevem sem combinar nada, e o padrao de perda
+ * O ponto NÃO é que fica pior. É que fica DIFERENTE. No cenário 02 uma thread só
+ * intercalava as promises nos pontos de await, então a perda seguia o ritmo do
+ * event loop. Aqui os núcleos escrevem sem combinar nada, e o padrão de perda
  * muda: costuma haver menos leitores presos no mesmo valor velho ao mesmo tempo,
- * porque cada worker tem a propria fila de conexao e o proprio ritmo.
+ * porque cada worker tem a própria fila de conexão e o próprio ritmo.
  *
- * Rodar os dois lado a lado e a melhor forma de matar a ideia de que "isso e
+ * Rodar os dois lado a lado é a melhor forma de matar a ideia de que "isso é
  * problema de thread".
  */
 import { performance } from 'node:perf_hooks';
@@ -94,9 +94,9 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
 if (ehPrincipal(import.meta.url)) {
   const cfg = lerConfig();
   const workers = Math.min(8, Math.max(2, cfg.concorrencia));
-  titulo('CENARIO 08 - a corrida do cenario 02, agora com workers');
+  titulo('CENÁRIO 08 - a corrida do cenário 02, agora com workers');
   console.log(`  ${cfg.operacoes} saques na conta ${CONTA_ALVO}, divididos entre ${workers} workers,`);
-  console.log('  cada um com o proprio Pool. Paralelismo de verdade.');
+  console.log('  cada um com o próprio Pool. Paralelismo de verdade.');
 
   const comWorkers = await executar({
     operacoes: cfg.operacoes,
@@ -114,10 +114,10 @@ if (ehPrincipal(import.meta.url)) {
     valorSaque: cfg.valorSaque,
   });
 
-  secao('lado a lado: mesma carga, mesma conta, mesma logica de saque');
+  secao('lado a lado: mesma carga, mesma conta, mesma lógica de saque');
   const linha = (rotulo: string, r: ResultadoCenario): void => {
     console.log(
-      `  ${rotulo.padEnd(26)} divergencia ${String(r.invariante.divergencia).padStart(8)}` +
+      `  ${rotulo.padEnd(26)} divergência ${String(r.invariante.divergencia).padStart(8)}` +
         `   debitou ${String(r.extra?.saquesEfetivados).padStart(4)} de ${r.concluidas}` +
         `   ${r.throughput.toFixed(0).padStart(5)} ops/s`,
     );
@@ -126,6 +126,6 @@ if (ehPrincipal(import.meta.url)) {
   linha(`08 workers (${workers} threads)`, comWorkers);
 
   console.log('');
-  console.log('  > Os dois perdem dinheiro. O bug nao veio da thread, veio do read-modify-write.');
-  console.log('  > O que muda entre eles e o padrao da perda, nao a existencia dela.\n');
+  console.log('  > Os dois perdem dinheiro. O bug não veio da thread, veio do read-modify-write.');
+  console.log('  > O que muda entre eles é o padrão da perda, não a existência dela.\n');
 }

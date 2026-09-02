@@ -4,13 +4,13 @@
  *   npx tsx src/benchmark.ts --scenarios 02,08 --concurrency 1,2,4,8,16,32,64 \
  *                            --repetitions 10 --operations 200
  *
- * Regras da medicao:
- *   - uma execucao de warm-up e descartada antes de cada serie
- *   - o estado do banco e recriado antes de CADA repeticao (cada cenario chama
- *     resetar() no inicio do proprio executar)
- *   - grava UMA LINHA POR REPETICAO em resultados/resultados.csv, nunca so a
- *     media: a dispersao entre repeticoes e metade do que este projeto mostra
- *   - nenhum cenario aborta o benchmark; erro vira linha com a coluna `falhou`
+ * Regras da medição:
+ *   - uma execução de warm-up é descartada antes de cada série
+ *   - o estado do banco é recriado antes de CADA repetição (cada cenário chama
+ *     resetar() no início do próprio executar)
+ *   - grava UMA LINHA POR REPETIÇÃO em resultados/resultados.csv, nunca só a
+ *     média: a dispersão entre repetições é metade do que este projeto mostra
+ *   - nenhum cenário aborta o benchmark; erro vira linha com a coluna `falhou`
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -26,12 +26,12 @@ interface Definicao {
   nome: string;
   bloco: 'A' | 'B';
   carregar: () => Promise<Modulo>;
-  /** concorrencias que fazem sentido para este cenario */
+  /** concorrências que fazem sentido para este cenário */
   concorrenciasPadrao: number[];
-  /** valor de `operacoes` quando --operations nao e passado */
+  /** valor de `operações` quando --operations não é passado */
   operacoesPadrao: number;
   /**
-   * true quando `operacoes` nao e "numero de saques" e sim outra escala
+   * true quando `operações` não é "número de saques" e sim outra escala
    * (rodadas de hash, incrementos por worker). Estes ignoram --operations.
    */
   escalaPropria: boolean;
@@ -171,7 +171,7 @@ function selecionarCenarios(bruto: string): Definicao[] {
   for (const pedido of pedidos) {
     const achados = CENARIOS.filter((c) => c.nome === pedido || c.nome.startsWith(`${pedido}-`));
     if (achados.length === 0) {
-      console.error(`\n[ERRO] Cenario "${pedido}" nao existe. Disponiveis:`);
+      console.error(`\n[ERRO] Cenário "${pedido}" não existe. Disponíveis:`);
       for (const c of CENARIOS) console.error(`       ${c.nome}`);
       process.exit(1);
     }
@@ -221,7 +221,7 @@ function lerArgumentos(argv: string[]): Argumentos {
         break;
       default:
         if (chave !== undefined && chave.startsWith('--')) {
-          console.error(`[ERRO] Opcao desconhecida: ${chave}\n`);
+          console.error(`[ERRO] Opção desconhecida: ${chave}\n`);
           console.log(AJUDA);
           process.exit(1);
         }
@@ -231,16 +231,16 @@ function lerArgumentos(argv: string[]): Argumentos {
 }
 
 const AJUDA = `
-Uso: npx tsx src/benchmark.ts [opcoes]
+Uso: npx tsx src/benchmark.ts [opções]
 
   --scenarios LISTA    nomes separados por virgula, ou "all", "A", "B"
                        exemplos: 02  |  02,08  |  01,02,05  |  B
-  --concurrency LISTA  ex: 1,2,4,8,16,32,64 (padrao: o que cada cenario define)
-  --repetitions N      padrao 10, uma linha no CSV por repeticao
-  --operations N       numero de saques por repeticao; cenarios de CPU e de
-                       memoria ignoram, porque a escala deles e outra
-  --no-warmup          nao descarta a primeira execucao de cada serie
-  --output DIR         padrao: resultados
+  --concurrency LISTA  ex: 1,2,4,8,16,32,64 (padrão: o que cada cenário define)
+  --repetitions N      padrão 10, uma linha no CSV por repetição
+  --operations N       número de saques por repetição; cenários de CPU e de
+                       memória ignoram, porque a escala deles e outra
+  --no-warmup          não descarta a primeira execução de cada série
+  --output DIR         padrão: resultados
 `;
 
 // ---------------------------------------------------------------------------
@@ -329,7 +329,7 @@ function linhaDeFalha(
 }
 
 // ---------------------------------------------------------------------------
-// execucao
+// execução
 // ---------------------------------------------------------------------------
 export async function rodar(args: Argumentos): Promise<void> {
   const cfg = lerConfig();
@@ -350,7 +350,7 @@ export async function rodar(args: Argumentos): Promise<void> {
     const concorrencias = args.concorrencia ?? def.concorrenciasPadrao;
     const operacoes = def.escalaPropria ? def.operacoesPadrao : args.operacoes ?? def.operacoesPadrao;
 
-    secao(`${def.nome}   bloco ${def.bloco}   operacoes=${operacoes.toLocaleString('pt-BR')}`);
+    secao(`${def.nome}   bloco ${def.bloco}   operações=${operacoes.toLocaleString('pt-BR')}`);
 
     for (const concorrencia of concorrencias) {
       const opts: OpcoesCenario = {
@@ -366,7 +366,7 @@ export async function rodar(args: Argumentos): Promise<void> {
         try {
           await modulo.executar(opts);
         } catch {
-          // warm-up nao entra no CSV nem interrompe nada
+          // warm-up não entra no CSV nem interrompe nada
         }
       } else {
         process.stdout.write(`  c=${String(concorrencia).padStart(3)}  `);
@@ -400,7 +400,7 @@ export async function rodar(args: Argumentos): Promise<void> {
       const min = (v: number[]): number => (v.length === 0 ? 0 : Math.min(...v));
       const max = (v: number[]): number => (v.length === 0 ? 0 : Math.max(...v));
       console.log(
-        `  ${media(tempos).toFixed(0).padStart(6)} ms medio   ` +
+        `  ${media(tempos).toFixed(0).padStart(6)} ms médio   ` +
           `perdido ${media(perdas).toFixed(1).padStart(8)} ` +
           `(min ${min(perdas)} / max ${max(perdas)})`,
       );
@@ -415,15 +415,15 @@ export async function rodar(args: Argumentos): Promise<void> {
   console.log(`  ${join(args.saida, 'resultados.csv')}          ${linhas.length - 1} linhas`);
   console.log(`  ${join(args.saida, 'distribuicao.csv')}        ${distribuicao.length - 1} linhas`);
   console.log(`  ${join(args.saida, 'serie-leitura-suja.csv')}  ${serie.length - 1} linhas`);
-  if (falhas > 0) console.log(`\n  ${falhas} repeticoes falharam e estao marcadas com falhou=sim no CSV.`);
-  console.log('\n  Gere os graficos com:  npm run charts\n');
+  if (falhas > 0) console.log(`\n  ${falhas} repetições falharam e estão marcadas com falhou=sim no CSV.`);
+  console.log('\n  Gere os gráficos com:  npm run charts\n');
 }
 
 if (ehPrincipal(import.meta.url)) {
   const args = lerArgumentos(process.argv.slice(2));
   titulo('BENCHMARK');
-  console.log(`  cenarios: ${args.cenarios.map((c) => c.nome).join(', ')}`);
-  console.log(`  repeticoes: ${args.repeticoes}   warm-up: ${args.warmup ? 'sim' : 'nao'}`);
-  if (args.concorrencia) console.log(`  concorrencia: ${args.concorrencia.join(', ')}`);
+  console.log(`  cenários: ${args.cenarios.map((c) => c.nome).join(', ')}`);
+  console.log(`  repetições: ${args.repeticoes}   warm-up: ${args.warmup ? 'sim' : 'não'}`);
+  if (args.concorrencia) console.log(`  concorrência: ${args.concorrencia.join(', ')}`);
   await rodar(args);
 }

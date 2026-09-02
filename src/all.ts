@@ -1,17 +1,17 @@
 /**
- * Roda os 11 cenarios em sequencia, com a saida de apresentacao de cada um.
+ * Roda os 11 cenários em sequência, com a saída de apresentação de cada um.
  *
  *   npm run all                     todos, na ordem
- *   npm run all -- --only 02,06     so os cenarios pedidos
- *   npm run all -- --block A        so o bloco A (1 a 5) ou B (6 a 11)
+ *   npm run all -- --only 02,06     só os cenários pedidos
+ *   npm run all -- --block A        só o bloco A (1 a 5) ou B (6 a 11)
  *   npm run all -- --fail-fast
  *
- * Cada cenario roda num processo separado, com stdio herdado, exatamente como
- * se voce tivesse chamado `npx tsx src/cenarios/02-corrida-sem-thread.ts` na
- * mao. Isso mantem a saida identica a do cenario isolado e garante que um
- * cenario nao contamine o proximo com estado de modulo ou worker vivo.
+ * Cada cenário roda num processo separado, com stdio herdado, exatamente como
+ * se você tivesse chamado `npx tsx src/cenários/02-corrida-sem-thread.ts` na
+ * mao. Isso mantém a saída idêntica à do cenário isolado e garante que um
+ * cenário não contamine o próximo com estado de módulo ou worker vivo.
  *
- * Para medir e gerar graficos, o comando e outro: `npm run bench`.
+ * Para medir e gerar gráficos, o comando é outro: `npm run bench`.
  */
 import { spawnSync } from 'node:child_process';
 import { readdirSync } from 'node:fs';
@@ -23,7 +23,7 @@ import { secao, titulo } from './relatorio.js';
 const PASTA = join('src', 'cenarios');
 const TSX = join('node_modules', '.bin', 'tsx');
 
-/** Os cenarios 1 a 5 sao o bloco A, 6 a 11 sao o bloco B. */
+/** Os cenários 1 a 5 são o bloco A, 6 a 11 são o bloco B. */
 function blocoDe(arquivo: string): 'A' | 'B' {
   return Number(arquivo.slice(0, 2)) <= 5 ? 'A' : 'B';
 }
@@ -64,7 +64,7 @@ function lerArgumentos(argv: string[]): Argumentos {
         break;
       default:
         if (chave !== undefined && chave.startsWith('--')) {
-          console.error(`[ERRO] Opcao desconhecida: ${chave}\n${AJUDA}`);
+          console.error(`[ERRO] Opção desconhecida: ${chave}\n${AJUDA}`);
           process.exit(1);
         }
     }
@@ -73,13 +73,18 @@ function lerArgumentos(argv: string[]): Argumentos {
 }
 
 const AJUDA = `
-Uso: npm run all -- [opcoes]
+Uso: npm run all -- [opções]
 
-  --only LISTA    so estes cenarios, por prefixo. ex: --only 02,06,11
-  --block A|B     so o bloco A (sem thread) ou B (worker_threads)
-  --fail-fast     interrompe no primeiro cenario que falhar
-                  (o padrao e seguir e reportar no resumo do fim)
+  --only LISTA    só estes cenários, por prefixo. ex: --only 02,06,11
+  --block A|B     só o bloco A (sem thread) ou B (worker_threads)
+  --fail-fast     interrompe no primeiro cenário que falhar
+                  (o padrão e seguir e reportar no resumo do fim)
 `;
+
+/** Concordância de número, para não sair "1 cenários" na tela. */
+function plural(n: number, singular: string, plural: string): string {
+  return `${n} ${n === 1 ? singular : plural}`;
+}
 
 interface Execucao {
   arquivo: string;
@@ -100,8 +105,8 @@ if (args.apenas !== undefined) {
   const filtrados = arquivos.filter((f) => pedidos.some((p) => f.startsWith(p)));
   const semCorrespondencia = pedidos.filter((p) => !arquivos.some((f) => f.startsWith(p)));
   if (semCorrespondencia.length > 0) {
-    console.error(`\n[ERRO] Nao achei cenario para: ${semCorrespondencia.join(', ')}`);
-    console.error('       Disponiveis:');
+    console.error(`\n[ERRO] Não achei cenário para: ${semCorrespondencia.join(', ')}`);
+    console.error('       Disponíveis:');
     for (const f of arquivos) console.error(`       ${f.replace(/\.ts$/, '')}`);
     console.error('');
     process.exit(1);
@@ -110,22 +115,22 @@ if (args.apenas !== undefined) {
 }
 
 if (arquivos.length === 0) {
-  console.error('\n[ERRO] Nenhum cenario selecionado.\n');
+  console.error('\n[ERRO] Nenhum cenário selecionado.\n');
   process.exit(1);
 }
 
-// checa o banco uma vez, aqui, para nao repetir a mesma falha 11 vezes
+// checa o banco uma vez, aqui, para não repetir a mesma falha 11 vezes
 const cfg = lerConfig();
 const pool = criarPool(2, cfg);
 await verificarConexao(pool);
 await fecharPool(pool);
 
-titulo(`RODANDO ${arquivos.length} CENARIOS`);
+titulo(`RODANDO ${plural(arquivos.length, 'CENÁRIO', 'CENÁRIOS')}`);
 console.log(`  banco: ${cfg.host}:${cfg.port}/${cfg.database}`);
 console.log(`  ${cfg.contas} contas x ${cfg.saldoInicial} de saldo inicial`);
 console.log('');
-console.log('  O cenario 11 escreve os logs de depuracao em stderr, porque o barulho');
-console.log('  dele e o proprio experimento. Para ver so os resumos:');
+console.log('  O cenário 11 escreve os logs de depuração em stderr, porque o barulho');
+console.log('  dele é o próprio experimento. Para ver só os resumos:');
 console.log('    npm run all 2>/dev/null');
 
 const execucoes: Execucao[] = [];
@@ -144,12 +149,12 @@ for (const [indice, arquivo] of arquivos.entries()) {
   execucoes.push({ arquivo: nome, bloco, ms, codigo });
 
   if (codigo !== 0) {
-    console.error(`\n  [FALHOU] ${nome} saiu com codigo ${codigo}.`);
+    console.error(`\n  [FALHOU] ${nome} saiu com código ${codigo}.`);
     if (args.pararNoErro) {
       console.error('  --fail-fast ligado, interrompendo aqui.\n');
       break;
     }
-    console.error('  Seguindo para o proximo. Use --fail-fast para interromper.\n');
+    console.error('  Seguindo para o próximo. Use --fail-fast para interromper.\n');
   }
 }
 
@@ -157,21 +162,21 @@ const msGeral = performance.now() - inicioGeral;
 const falhas = execucoes.filter((e) => e.codigo !== 0);
 
 titulo('RESUMO');
-console.log(`  ${'cenario'.padEnd(28)}${'bloco'.padEnd(8)}${'tempo'.padStart(10)}   status`);
+console.log(`  ${'cenário'.padEnd(28)}${'bloco'.padEnd(8)}${'tempo'.padStart(10)}   status`);
 console.log('  ' + '-'.repeat(62));
 for (const e of execucoes) {
   console.log(
     `  ${e.arquivo.padEnd(28)}${e.bloco.padEnd(8)}${`${(e.ms / 1000).toFixed(1)} s`.padStart(10)}   ` +
-      (e.codigo === 0 ? 'ok' : `FALHOU (codigo ${e.codigo})`),
+      (e.codigo === 0 ? 'ok' : `FALHOU (código ${e.codigo})`),
   );
 }
 console.log('');
-console.log(`  ${execucoes.length} cenarios em ${(msGeral / 1000).toFixed(1)} s`);
+console.log(`  ${plural(execucoes.length, 'cenário', 'cenários')} em ${(msGeral / 1000).toFixed(1)} s`);
 if (falhas.length > 0) {
-  console.log(`  ${falhas.length} falharam: ${falhas.map((f) => f.arquivo).join(', ')}`);
+  console.log(`  ${plural(falhas.length, 'falhou', 'falharam')}: ${falhas.map((f) => f.arquivo).join(', ')}`);
 }
 console.log('');
-console.log('  Para medir com repeticoes e gerar os graficos:');
+console.log('  Para medir com repetições e gerar os gráficos:');
 console.log('    caffeinate -i npm run bench -- --scenarios all --repetitions 10');
 console.log('    npm run charts');
 console.log('');

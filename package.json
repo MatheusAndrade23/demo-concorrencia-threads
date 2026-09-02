@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Projeto didatico: bugs de concorrencia com async/await e worker_threads",
+  "description": "Projeto didático: bugs de concorrência com async/await e worker_threads",
   "engines": {
     "node": ">=20"
   },

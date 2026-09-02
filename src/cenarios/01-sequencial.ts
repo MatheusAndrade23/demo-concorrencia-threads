@@ -1,10 +1,10 @@
 /**
- * CENARIO 01 - sequencial   (Bloco A)
+ * CENÁRIO 01 - sequencial   (Bloco A)
  *
- * Baseline correto. Um await por vez, em laco. Nao ha bug aqui: este e o unico
- * cenario que serve de referencia de throughput e a prova de que a logica do
- * saque esta certa. Todo desvio que aparecer nos outros cenarios vem da forma
- * como o saque foi orquestrado, nao do saque em si.
+ * Baseline correto. Um await por vez, em laço. Não há bug aqui: este é o único
+ * cenário que serve de referência de throughput e a prova de que a lógica do
+ * saque está certa. Todo desvio que aparecer nos outros cenários vem da forma
+ * como o saque foi orquestrado, não do saque em si.
  */
 import { performance } from 'node:perf_hooks';
 import {
@@ -26,14 +26,14 @@ export const NOME = '01-sequencial';
 const CONTA_ALVO = 1;
 
 /**
- * SELECT, calculo em JS, UPDATE. Exatamente o mesmo saque do cenario 02.
- * A unica diferenca entre os dois cenarios e quem chama isto e como.
+ * SELECT, cálculo em JS, UPDATE. Exatamente o mesmo saque do cenário 02.
+ * A única diferença entre os dois cenários é quem chama isto e como.
  */
 async function saque(pool: Pool, contaId: number, valor: number): Promise<void> {
   const { rows } = await pool.query('SELECT saldo FROM contas WHERE id = $1', [contaId]);
 
-  // pg devolve NUMERIC como string. Sem esta conversao, "1000" - 1 ate funciona
-  // por coercao, mas "1000" + 1 daria "10001". Ver paraNumero em db.ts.
+  // pg devolve NUMERIC como string. Sem esta conversão, "1000" - 1 até funciona
+  // por coerção, mas "1000" + 1 daria "10001". Ver paraNumero em db.ts.
   const saldo = paraNumero(rows[0].saldo);
 
   const novoSaldo = saldo - valor;
@@ -58,7 +58,7 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
 
   const inicio = performance.now();
   for (let i = 0; i < opts.operacoes; i++) {
-    // um await por vez: o proximo SELECT so acontece depois do UPDATE anterior
+    // um await por vez: o próximo SELECT só acontece depois do UPDATE anterior
     try {
       await saque(pool, CONTA_ALVO, opts.valorSaque);
       concluidas++;
@@ -86,7 +86,7 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
 
 if (ehPrincipal(import.meta.url)) {
   const cfg = lerConfig();
-  titulo('CENARIO 01 - sequencial (baseline correto)');
+  titulo('CENÁRIO 01 - sequencial (baseline correto)');
   console.log(`  ${cfg.operacoes} saques de ${cfg.valorSaque} na conta ${CONTA_ALVO}, um de cada vez.`);
 
   const r = await executar({
@@ -96,7 +96,7 @@ if (ehPrincipal(import.meta.url)) {
   });
 
   imprimirResumo(r, [
-    'Divergencia zero: cada SELECT ja enxerga o UPDATE anterior.',
-    'Guarde este throughput. Ele e o teto do cenario 05 e o piso dos demais.',
+    'Divergência zero: cada SELECT já enxerga o UPDATE anterior.',
+    'Guarde este throughput. Ele é o teto do cenário 05 e o piso dos demais.',
   ]);
 }

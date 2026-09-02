@@ -1,8 +1,8 @@
 /**
- * Pool, seed e verificacao da invariante.
+ * Pool, seed e verificação da invariante.
  *
- * Este e o unico arquivo do projeto que NAO contem bug intencional: ele e a
- * regua. Se a medicao aqui estiver errada, nenhum cenario prova nada.
+ * Este é o único arquivo do projeto que NÃO contém bug intencional: ele é a
+ * régua. Se a medição aqui estiver errada, nenhum cenário prova nada.
  */
 import 'dotenv/config';
 import pg from 'pg';
@@ -20,9 +20,9 @@ export interface Config {
   database: string;
   /** quantas contas o seed cria */
   contas: number;
-  /** saldo de cada conta apos o seed */
+  /** saldo de cada conta após o seed */
   saldoInicial: number;
-  /** padroes usados quando um cenario roda sozinho */
+  /** padrões usados quando um cenário roda sozinho */
   operacoes: number;
   concorrencia: number;
   valorSaque: number;
@@ -33,7 +33,7 @@ function numeroDoAmbiente(chave: string, padrao: number): number {
   if (bruto === undefined || bruto.trim() === '') return padrao;
   const n = Number(bruto);
   if (!Number.isFinite(n)) {
-    throw new Error(`Variavel de ambiente ${chave} deveria ser um numero, veio "${bruto}".`);
+    throw new Error(`Variável de ambiente ${chave} deveria ser um número, veio "${bruto}".`);
   }
   return n;
 }
@@ -56,9 +56,9 @@ export function lerConfig(): Config {
 /**
  * Cria um Pool novo.
  *
- * `max` importa: se o pool tiver menos conexoes do que a concorrencia pedida,
- * ele proprio enfileira as operacoes e a corrida do cenario 02 fica mascarada.
- * Por isso todo cenario concorrente passa max = concorrencia.
+ * `max` importa: se o pool tiver menos conexões do que a concorrência pedida,
+ * ele próprio enfileira as operações e a corrida do cenário 02 fica mascarada.
+ * Por isso todo cenário concorrente passa max = concorrência.
  */
 export function criarPool(max = 10, cfg: Config = lerConfig()): Pool {
   return new pg.Pool({
@@ -74,18 +74,18 @@ export function criarPool(max = 10, cfg: Config = lerConfig()): Pool {
 }
 
 /**
- * Abre `n` conexoes e devolve todas ao pool.
+ * Abre `n` conexões e devolve todas ao pool.
  *
- * Sem isto, um cenario curto paga o handshake de N conexoes dentro da janela
- * medida e o Pool aparece mais lento do que e. Higiene de medicao, nao correcao
- * de bug: o warm-up nao muda em nada a corrida que os cenarios demonstram.
+ * Sem isto, um cenário curto paga o handshake de N conexões dentro da janela
+ * medida e o Pool aparece mais lento do que é. Higiene de medição, não correção
+ * de bug: o warm-up não muda em nada a corrida que os cenários demonstram.
  */
 export async function aquecerPool(pool: Pool, n: number): Promise<void> {
   const clientes = await Promise.all(Array.from({ length: n }, () => pool.connect()));
   for (const c of clientes) c.release();
 }
 
-/** Um Client solto, sem pool. Usado de proposito pelo cenario 05. */
+/** Um Client solto, sem pool. Usado de propósito pelo cenário 05. */
 export function criarClient(cfg: Config = lerConfig()): pg.Client {
   return new pg.Client({
     host: cfg.host,
@@ -97,8 +97,8 @@ export function criarClient(cfg: Config = lerConfig()): pg.Client {
 }
 
 /**
- * Falha com mensagem legivel em vez de despejar um ECONNREFUSED cru.
- * Encerra o processo: nenhum cenario faz sentido sem banco.
+ * Falha com mensagem legível em vez de despejar um ECONNREFUSED cru.
+ * Encerra o processo: nenhum cenário faz sentido sem banco.
  */
 export async function verificarConexao(pool: Pool): Promise<void> {
   const cfg = lerConfig();
@@ -107,22 +107,22 @@ export async function verificarConexao(pool: Pool): Promise<void> {
   } catch (erro) {
     const e = erro as NodeJS.ErrnoException & { code?: string };
     const alvo = `${cfg.host}:${cfg.port}/${cfg.database}`;
-    console.error(`\n[ERRO] Nao consegui falar com o Postgres em ${alvo}.`);
+    console.error(`\n[ERRO] Não consegui falar com o Postgres em ${alvo}.`);
     switch (e.code) {
       case 'ECONNREFUSED':
-        console.error('       O banco esta fora do ar. Suba com:  npm run db:up');
+        console.error('       O banco está fora do ar. Suba com:  npm run db:up');
         break;
       case 'ENOTFOUND':
-        console.error(`       O host "${cfg.host}" nao resolve. Confira PGHOST no .env.`);
+        console.error(`       O host "${cfg.host}" não resolve. Confira PGHOST no .env.`);
         break;
       case 'ETIMEDOUT':
-        console.error('       A conexao expirou. O container esta rodando?  docker compose ps');
+        console.error('       A conexão expirou. O container está rodando?  docker compose ps');
         break;
       case '28P01':
-        console.error('       Usuario ou senha recusados. Confira PGUSER e PGPASSWORD no .env.');
+        console.error('       Usuário ou senha recusados. Confira PGUSER e PGPASSWORD no .env.');
         break;
       case '3D000':
-        console.error(`       O banco "${cfg.database}" nao existe. Confira PGDATABASE no .env.`);
+        console.error(`       O banco "${cfg.database}" não existe. Confira PGDATABASE no .env.`);
         break;
       default:
         console.error(`       ${e.message}`);
@@ -139,8 +139,8 @@ export async function migrar(pool: Pool): Promise<void> {
     CREATE TABLE IF NOT EXISTS contas (
       id      SERIAL PRIMARY KEY,
       titular TEXT NOT NULL,
-      -- Sem CHECK (saldo >= 0) DE PROPOSITO: a constraint transformaria parte do
-      -- lost update em erro visivel e esconderia o dinheiro que some.
+      -- Sem CHECK (saldo >= 0) DE PROPÓSITO: a constraint transformaria parte do
+      -- lost update em erro visível e esconderia o dinheiro que some.
       saldo   NUMERIC(12,2) NOT NULL
     );
 
@@ -167,18 +167,18 @@ export async function semear(pool: Pool, cfg: Config = lerConfig()): Promise<voi
   );
 }
 
-/** migrar + semear. O benchmark chama isto antes de CADA repeticao. */
+/** migrar + semear. O benchmark chama isto antes de CADA repetição. */
 export async function resetar(pool: Pool, cfg: Config = lerConfig()): Promise<void> {
   await migrar(pool);
   await semear(pool, cfg);
 }
 
 /**
- * A PEGADINHA DO pg: NUMERIC volta como string, nao como number.
+ * A PEGADINHA DO pg: NUMERIC volta como string, não como number.
  *
- * O driver faz isso de proposito, porque NUMERIC(12,2) do Postgres tem precisao
- * maior do que o double do JS e converter sozinho perderia informacao. O efeito
- * pratico e que "500" - 1 da 499, mas "500" + 1 da "5001". Toda leitura de saldo
+ * O driver faz isso de propósito, porque NUMERIC(12,2) do Postgres tem precisão
+ * maior do que o double do JS e converter sozinho perderia informação. O efeito
+ * prático é que "500" - 1 dá 499, mas "500" + 1 dá "5001". Toda leitura de saldo
  * neste projeto passa por aqui.
  */
 export function paraNumero(v: string | number | null): number {
@@ -212,21 +212,21 @@ export async function somaMovimentos(pool: Pool): Promise<number> {
   return paraNumero(rows[0].total);
 }
 
-/** Arredonda em centavos, para nao acusar perda por ruido de ponto flutuante. */
+/** Arredonda em centavos, para não acusar perda por ruído de ponto flutuante. */
 export function centavos(v: number): number {
   return Math.round(v * 100) / 100;
 }
 
 /**
- * Confere a invariante do projeto contra o razao. Ver o comentario de
- * `Invariante` em tipos.ts para a definicao e o porque.
+ * Confere a invariante do projeto contra o razão. Ver o comentário de
+ * `Invariante` em tipos.ts para a definição e o porquê.
  */
 export async function verificarInvariante(pool: Pool, saldoInicial: number): Promise<Invariante> {
   const [observado, movimentos] = await Promise.all([somaSaldos(pool), somaMovimentos(pool)]);
   return montarInvariante(saldoInicial, movimentos, observado);
 }
 
-/** Mesma conta, sem banco. O cenario 06 usa isto para o contador em memoria. */
+/** Mesma conta, sem banco. O cenário 06 usa isto para o contador em memória. */
 export function montarInvariante(
   saldoInicial: number,
   movimentos: number,
@@ -245,14 +245,14 @@ export function montarInvariante(
 }
 
 export interface ErroClassificado {
-  /** SQLSTATE quando vem do Postgres, ou um pseudo-codigo para o resto */
+  /** SQLSTATE quando vem do Postgres, ou um pseudo-código para o resto */
   sqlstate: string;
   mensagem: string;
 }
 
 /**
- * Todo erro vira {sqlstate, mensagem}. Erros que nao sao do banco recebem um
- * pseudo-codigo em maiusculas (ECONNREFUSED, JS, DESCONHECIDO) para caberem na
+ * Todo erro vira {sqlstate, mensagem}. Erros que não são do banco recebem um
+ * pseudo-código em maiúsculas (ECONNREFUSED, JS, DESCONHECIDO) para caberem na
  * mesma contagem sem precisar de outro campo.
  */
 export function classificarErro(erro: unknown): ErroClassificado {
@@ -263,7 +263,7 @@ export function classificarErro(erro: unknown): ErroClassificado {
   return { sqlstate: 'DESCONHECIDO', mensagem: String(erro) };
 }
 
-/** Acumula erros por SQLSTATE. Nenhum cenario aborta o benchmark. */
+/** Acumula erros por SQLSTATE. Nenhum cenário aborta o benchmark. */
 export class ContadorDeErros {
   private readonly contagem = new Map<string, number>();
   private readonly exemplos = new Map<string, string>();

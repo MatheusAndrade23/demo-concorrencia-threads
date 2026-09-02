@@ -1,9 +1,9 @@
 /**
- * Worker do cenario 10. Transferencias SEM transacao.
+ * Worker do cenário 10. Transferências SEM transação.
  *
- * Cada worker tem o proprio par de contas, entao nao ha disputa por linha e nada
- * se perde no fim. O problema e outro: entre o debito e o credito existe um
- * intervalo em que o dinheiro nao esta em conta nenhuma, e qualquer relatorio
+ * Cada worker tem o próprio par de contas, então não há disputa por linha e nada
+ * se perde no fim. O problema é outro: entre o débito e o crédito existe um
+ * intervalo em que o dinheiro não está em conta nenhuma, e qualquer relatório
  * que passar por ali enxerga um total que nunca foi verdade.
  */
 import { parentPort, workerData } from 'node:worker_threads';
@@ -15,7 +15,7 @@ export interface ParamsTransferencia {
   para: number;
   valor: number;
   transferencias: number;
-  /** quanto tempo o dinheiro fica "no ar" entre o debito e o credito */
+  /** quanto tempo o dinheiro fica "no ar" entre o débito e o crédito */
   pausaMs: number;
   origem: string;
 }
@@ -33,7 +33,7 @@ let concluidas = 0;
 
 for (let i = 0; i < transferencias; i++) {
   try {
-    // BUG INTENCIONAL: sem BEGIN/COMMIT. Sao duas transacoes independentes, e
+    // BUG INTENCIONAL: sem BEGIN/COMMIT. São duas transações independentes, e
     // entre elas o sistema fica com menos dinheiro do que deveria.
     const linhaOrigem = await pool.query('SELECT saldo FROM contas WHERE id = $1', [de]);
     await pool.query('UPDATE contas SET saldo = $1 WHERE id = $2', [
@@ -46,7 +46,7 @@ for (let i = 0; i < transferencias; i++) {
       origem,
     ]);
 
-    // o dinheiro esta no ar exatamente aqui
+    // o dinheiro está no ar exatamente aqui
     await pool.query('SELECT pg_sleep($1)', [pausaMs / 1000]);
 
     const linhaDestino = await pool.query('SELECT saldo FROM contas WHERE id = $1', [para]);

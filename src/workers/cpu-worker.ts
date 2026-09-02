@@ -1,6 +1,6 @@
 /**
- * Worker do cenario 07. Roda exatamente a mesma funcao do cenario 04, so que
- * na propria thread. Nao toca no banco.
+ * Worker do cenário 07. Roda exatamente a mesma função do cenário 04, só que
+ * na própria thread. Não toca no banco.
  */
 import { performance } from 'node:perf_hooks';
 import { parentPort, workerData } from 'node:worker_threads';
@@ -13,7 +13,7 @@ export interface ParamsCpu {
 export interface ResultadoCpu {
   rodadas: number;
   ms: number;
-  /** so para provar que o trabalho aconteceu de verdade */
+  /** só para provar que o trabalho aconteceu de verdade */
   digest: number;
 }
 

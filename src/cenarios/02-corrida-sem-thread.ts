@@ -1,17 +1,17 @@
 /**
- * CENARIO 02 - corrida sem thread nenhuma   (Bloco A)
+ * CENÁRIO 02 - corrida sem thread nenhuma   (Bloco A)
  *
- * O cenario mais importante do projeto.
+ * O cenário mais importante do projeto.
  *
- * O saque abaixo e IDENTICO ao do cenario 01: SELECT, calculo em JS, UPDATE.
- * A unica mudanca e que varias chamadas correm ao mesmo tempo via Promise.all.
- * Nao existe worker_thread aqui, nao existe paralelismo de verdade, o processo
+ * O saque abaixo é IDÊNTICO ao do cenário 01: SELECT, cálculo em JS, UPDATE.
+ * A única mudança é que várias chamadas correm ao mesmo tempo via Promise.all.
+ * Não existe worker_thread aqui, não existe paralelismo de verdade, o processo
  * tem UMA thread de JavaScript. E o dinheiro some assim mesmo.
  *
- * A janela de perigo e o `await` no meio: entre ler o saldo e gravar o novo
+ * A janela de perigo é o `await` no meio: entre ler o saldo e gravar o novo
  * saldo, o event loop entrega o controle para outra promise, que le o MESMO
- * saldo velho. As duas calculam a partir do mesmo numero e a segunda gravacao
- * apaga a primeira. Isso e um lost update, e nao precisou de thread.
+ * saldo velho. As duas calculam a partir do mesmo número e a segunda gravação
+ * apaga a primeira. Isso é um lost update, e não precisou de thread.
  */
 import { performance } from 'node:perf_hooks';
 import {
@@ -35,11 +35,11 @@ const CONTA_ALVO = 1;
 async function saque(pool: Pool, contaId: number, valor: number): Promise<void> {
   const { rows } = await pool.query('SELECT saldo FROM contas WHERE id = $1', [contaId]);
 
-  // pg devolve NUMERIC como string; a conversao e obrigatoria
+  // pg devolve NUMERIC como string; a conversão é obrigatória
   const saldo = paraNumero(rows[0].saldo);
 
   // BUG INTENCIONAL: o saldo lido aqui pode estar obsoleto quando o UPDATE
-  // abaixo rodar, porque outra promise ja gravou nesse intervalo.
+  // abaixo rodar, porque outra promise já gravou nesse intervalo.
   const novoSaldo = saldo - valor;
 
   await pool.query('UPDATE contas SET saldo = $1 WHERE id = $2', [novoSaldo, contaId]);
@@ -53,8 +53,8 @@ async function saque(pool: Pool, contaId: number, valor: number): Promise<void> 
 export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
   const cfg = lerConfig();
 
-  // max = concorrencia de proposito: com um pool menor, o proprio driver
-  // enfileira as operacoes e a corrida some (e o que acontece no cenario 05).
+  // max = concorrência de propósito: com um pool menor, o próprio driver
+  // enfileira as operações e a corrida some (é o que acontece no cenário 05).
   const pool = criarPool(opts.concorrencia, cfg);
   await verificarConexao(pool);
   await resetar(pool, cfg);
@@ -67,9 +67,9 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
 
   async function trabalhador(indice: number): Promise<void> {
     while (restantes > 0) {
-      // Este decremento NAO tem corrida: e uma thread so e nao ha await entre
-      // a leitura e a escrita de `restantes`. Contraste com o saldo la em cima,
-      // que atravessa um await. A diferenca entre os dois e a aula inteira.
+      // Este decremento NÃO tem corrida: é uma thread só e não há await entre
+      // a leitura e a escrita de `restantes`. Contraste com o saldo lá em cima,
+      // que atravessa um await. A diferença entre os dois é a aula inteira.
       restantes--;
       try {
         await saque(pool, CONTA_ALVO, opts.valorSaque);
@@ -107,7 +107,7 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
 
 if (ehPrincipal(import.meta.url)) {
   const cfg = lerConfig();
-  titulo('CENARIO 02 - corrida sem thread nenhuma');
+  titulo('CENÁRIO 02 - corrida sem thread nenhuma');
   console.log(`  ${cfg.operacoes} saques de ${cfg.valorSaque} na conta ${CONTA_ALVO},`);
   console.log(`  ${cfg.concorrencia} promises concorrentes, 1 (uma) thread de JavaScript.`);
 
@@ -118,12 +118,12 @@ if (ehPrincipal(import.meta.url)) {
   });
 
   imprimirResumo(r, [
-    'Zero workers. Zero threads. process.env.UV_THREADPOOL nao tem nada a ver.',
-    `O razao registrou ${r.concluidas} saques, a conta debitou ${r.extra?.saquesEfetivados}.`,
-    'A diferenca e dinheiro que o banco pagou e nunca cobrou.',
+    'Zero workers. Zero threads. process.env.UV_THREADPOOL não tem nada a ver.',
+    `O razão registrou ${r.concluidas} saques, a conta debitou ${r.extra?.saquesEfetivados}.`,
+    'A diferença é dinheiro que o banco pagou e nunca cobrou.',
   ]);
 
-  console.log('  operacoes por promise: ' + distribuicao(r.porTrabalhador));
+  console.log('  operações por promise: ' + distribuicao(r.porTrabalhador));
   barras(r.porTrabalhador, 'p');
   console.log('');
 }

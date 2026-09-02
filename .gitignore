@@ -3,8 +3,8 @@ dist/
 .env
 .DS_Store
 
-# os resultados sao entregaveis e ficam versionados; o log bruto da execucao nao
+# os resultados são entregáveis e ficam versionados; o log bruto da execução não
 resultados/*.log
 
-# specs intermediarios do vega-lite; "npm run charts" regenera a partir do CSV
+# specs intermediários do vega-lite; "npm run charts" regenera a partir do CSV
 resultados/*.vl.json

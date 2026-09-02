@@ -1,17 +1,17 @@
 /**
- * CENARIO 09 - deadlock sem nenhum lock no codigo   (Bloco B)
+ * CENÁRIO 09 - deadlock sem nenhum lock no código   (Bloco B)
  *
  * Metade dos workers transfere da conta A para a B, a outra metade da B para a
- * A, ao mesmo tempo. Nao existe mutex, semaforo nem `LOCK TABLE` em lugar nenhum
- * do codigo: quem trava e o UPDATE, porque no Postgres um UPDATE segura a linha
- * ate o COMMIT.
+ * A, ao mesmo tempo. Não existe mutex, semáforo nem `LOCK TABLE` em lugar nenhum
+ * do código: quem trava é o UPDATE, porque no Postgres um UPDATE segura a linha
+ * até o COMMIT.
  *
- * A transacao que vai de A para B trava A e depois quer B. A que vai de B para A
+ * A transação que vai de A para B trava A e depois quer B. A que vai de B para A
  * trava B e depois quer A. As duas esperam para sempre, e o Postgres detecta o
  * ciclo e mata uma delas com SQLSTATE 40P01 (deadlock_detected).
  *
- * O erro e capturado, classificado e contado. Nao ha retry: retry seria a
- * correcao, e a correcao nao e o produto aqui.
+ * O erro é capturado, classificado e contado. Não há retry: retry seria a
+ * correção, e a correção não é o produto aqui.
  */
 import { performance } from 'node:perf_hooks';
 import {
@@ -33,12 +33,12 @@ export const NOME = '09-deadlock';
 const CONTA_A = 1;
 const CONTA_B = 2;
 
-/** Tempo que cada transacao segura a primeira linha antes de pedir a segunda. */
+/** Tempo que cada transação segura a primeira linha antes de pedir a segunda. */
 export const PAUSA_MS = 20;
 
 export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
   const cfg = lerConfig();
-  // numero par: metade vai numa direcao, metade na outra
+  // número par: metade vai numa direção, metade na outra
   const workers = Math.max(2, opts.concorrencia % 2 === 0 ? opts.concorrencia : opts.concorrencia + 1);
 
   const poolDeApoio = criarPool(2, cfg);
@@ -109,7 +109,7 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
 if (ehPrincipal(import.meta.url)) {
   const cfg = lerConfig();
   const workers = Math.min(8, Math.max(2, cfg.concorrencia));
-  titulo('CENARIO 09 - deadlock sem nenhum lock no codigo');
+  titulo('CENÁRIO 09 - deadlock sem nenhum lock no código');
   console.log(`  ${workers} workers: metade transfere ${CONTA_A} -> ${CONTA_B},`);
   console.log(`  metade ${CONTA_B} -> ${CONTA_A}, tudo ao mesmo tempo.`);
 
@@ -119,18 +119,18 @@ if (ehPrincipal(import.meta.url)) {
     valorSaque: 10,
   });
 
-  secao('o que o Postgres fez com as transacoes');
+  secao('o que o Postgres fez com as transações');
   console.log(`  tentativas ............... ${r.extra?.tentativas}`);
   console.log(`  commitadas ............... ${r.concluidas}`);
   console.log(`  abortadas ................ ${r.extra?.transferenciasAbortadas} (${r.extra?.percentualAbortado}%)`);
   console.log(`  destas, deadlock 40P01 ... ${r.extra?.deadlocks}`);
 
   imprimirResumo(r, [
-    'Nenhuma linha deste projeto pede um lock. O UPDATE pede por voce.',
-    'O 40P01 nao e bug do Postgres, e o Postgres avisando que o codigo travou.',
-    'Nao ha retry aqui: a transferencia abortada simplesmente nao aconteceu.',
+    'Nenhuma linha deste projeto pede um lock. O UPDATE pede por você.',
+    'O 40P01 não é bug do Postgres, é o Postgres avisando que o código travou.',
+    'Não há retry aqui: a transferência abortada simplesmente não aconteceu.',
   ]);
-  console.log('  transferencias commitadas por worker (par = A->B, impar = B->A):');
+  console.log('  transferências commitadas por worker (par = A->B, ímpar = B->A):');
   barras(r.porTrabalhador, 'w');
   console.log('');
 }
