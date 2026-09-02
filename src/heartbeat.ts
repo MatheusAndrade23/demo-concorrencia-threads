@@ -1,7 +1,7 @@
 /**
- * Heartbeat de event loop, usado pelos cenarios 04 e 07.
+ * Heartbeat de event loop, usado pelos cenários 04 e 07.
  *
- * Um setInterval que deveria bater a cada 100 ms. A distancia entre duas
+ * Um setInterval que deveria bater a cada 100 ms. A distância entre duas
  * batidas mede quanto tempo o event loop passou sem conseguir rodar nada.
  */
 import { performance } from 'node:perf_hooks';

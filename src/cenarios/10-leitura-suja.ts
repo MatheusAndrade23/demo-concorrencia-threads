@@ -1,17 +1,17 @@
 /**
- * CENARIO 10 - o relatorio que le o meio da transferencia   (Bloco B)
+ * CENÁRIO 10 - o relatório que le o meio da transferência   (Bloco B)
  *
- * Workers transferem dinheiro entre pares de contas SEM transacao, enquanto a
- * thread principal roda `SELECT SUM(saldo) FROM contas` em laco, como faria um
+ * Workers transferem dinheiro entre pares de contas SEM transação, enquanto a
+ * thread principal roda `SELECT SUM(saldo) FROM contas` em laço, como faria um
  * dashboard.
  *
- * Cada worker tem o proprio par de contas, entao nao ha disputa por linha e no
- * fim NADA se perde: a divergencia fecha em zero. Mesmo assim, a serie temporal
- * do total observado balanca, porque entre o debito de uma conta e o credito da
- * outra existe um instante em que o dinheiro nao esta em lugar nenhum.
+ * Cada worker tem o próprio par de contas, então não há disputa por linha e no
+ * fim NADA se perde: a divergência fecha em zero. Mesmo assim, a série temporal
+ * do total observado balança, porque entre o débito de uma conta e o crédito da
+ * outra existe um instante em que o dinheiro não está em lugar nenhum.
  *
- * A licao e que um numero pode estar errado sem que nenhum dado esteja errado.
- * O erro esta em ter lido no meio de uma operacao que ainda nao acabou.
+ * A lição é que um número pode estar errado sem que nenhum dado esteja errado.
+ * O erro está em ter lido no meio de uma operação que ainda não acabou.
  */
 import { performance } from 'node:perf_hooks';
 import {
@@ -31,7 +31,7 @@ import type { ParamsTransferencia, ResultadoTransferencia } from '../workers/tra
 
 export const NOME = '10-leitura-suja';
 
-/** Quanto tempo o dinheiro fica "no ar" entre o debito e o credito. */
+/** Quanto tempo o dinheiro fica "no ar" entre o débito e o crédito. */
 export const PAUSA_MS = 15;
 export const VALOR_TRANSFERENCIA = 100;
 
@@ -44,7 +44,7 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
   const saldoInicial = await somaSaldos(poolDeApoio);
 
   // cada worker recebe um par exclusivo de contas: sem disputa por linha,
-  // nenhum lost update pode acontecer, e a unica anomalia sobra a leitura
+  // nenhum lost update pode acontecer, e a única anomalia sobra a leitura
   const paresDisponiveis = Math.floor(cfg.contas / 2);
   const workers = Math.max(1, Math.min(opts.concorrencia, paresDisponiveis));
   const porWorker = Math.max(1, Math.floor(opts.operacoes / workers));
@@ -65,7 +65,7 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
     }),
   );
 
-  // observador: le o total em laco, do comeco ao fim
+  // observador: le o total em laço, do começo ao fim
   const serie: Amostra[] = [];
   let observando = true;
   const inicio = performance.now();
@@ -128,8 +128,8 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
 
 if (ehPrincipal(import.meta.url)) {
   const cfg = lerConfig();
-  titulo('CENARIO 10 - a leitura suja');
-  console.log('  Transferencias sem transacao, e um SELECT SUM(saldo) em laco olhando.');
+  titulo('CENÁRIO 10 - a leitura suja');
+  console.log('  Transferências sem transação, e um SELECT SUM(saldo) em laço olhando.');
 
   const r = await executar({
     operacoes: 60,
@@ -145,7 +145,7 @@ if (ehPrincipal(import.meta.url)) {
   console.log(`  maior total observado .... ${Number(r.extra?.totalMaximoObservado).toFixed(2)}`);
   console.log(`  maior buraco ............. ${r.extra?.maiorBuraco}`);
 
-  secao('primeiras 30 amostras da serie');
+  secao('primeiras 30 amostras da série');
   for (const a of (r.serie ?? []).slice(0, 30)) {
     const desvio = a.valor - r.invariante.esperado;
     const marca = desvio === 0 ? '' : `   <-- ${desvio}`;
@@ -153,8 +153,8 @@ if (ehPrincipal(import.meta.url)) {
   }
 
   imprimirResumo(r, [
-    'Divergencia final zero: nenhum centavo se perdeu de verdade.',
-    'E mesmo assim o relatorio mostrou totais que nunca foram verdade.',
-    'Consistencia nao e so sobre o dado final, e sobre quando voce olha.',
+    'Divergência final zero: nenhum centavo se perdeu de verdade.',
+    'E mesmo assim o relatório mostrou totais que nunca foram verdade.',
+    'Consistência não é só sobre o dado final, é sobre quando você olha.',
   ]);
 }

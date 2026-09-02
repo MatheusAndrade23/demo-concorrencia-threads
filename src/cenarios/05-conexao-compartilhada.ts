@@ -1,23 +1,23 @@
 /**
- * CENARIO 05 - a conexao compartilhada   (Bloco A)
+ * CENÁRIO 05 - a conexão compartilhada   (Bloco A)
  *
- * Todas as operacoes usam o MESMO `Client` do pg em vez de um `Pool`.
+ * Todas as operações usam o MESMO `Client` do pg em vez de um `Pool`.
  *
- * O efeito nao e corrupcao, e serializacao: o driver mantem uma fila interna por
- * conexao e so manda a proxima query depois que a anterior respondeu. As 32
- * promises "concorrentes" viram uma fila unica, e o throughput desaba para o
- * nivel do cenario 01, sem que ninguem tenha escrito um laco sequencial.
+ * O efeito não é corrupção, é serialização: o driver mantém uma fila interna por
+ * conexão e só manda a próxima query depois que a anterior respondeu. As 32
+ * promises "concorrentes" viram uma fila única, e o throughput desaba para o
+ * nível do cenário 01, sem que ninguém tenha escrito um laço sequencial.
  *
- * SOBRE A LATENCIA SIMULADA: com o Postgres em loopback cada query responde em
- * ~0.15 ms e o gargalo vira a CPU do proprio Node, o que esconde o efeito. Um
+ * SOBRE A LATÊNCIA SIMULADA: com o Postgres em loopback cada query responde em
+ * ~0.15 ms e o gargalo vira a CPU do próprio Node, o que esconde o efeito. Um
  * banco de verdade, na rede, custa alguns milissegundos por ida e volta. Por
- * isso cada SELECT carrega um pg_sleep de LATENCIA_DE_REDE_MS: e a latencia que
- * o loopback nao tem, e e ela que revela a fila do driver.
+ * isso cada SELECT carrega um pg_sleep de LATENCIA_DE_REDE_MS: é a latência que
+ * o loopback não tem, e é ela que revela a fila do driver.
  *
- * Detalhe que costuma surpreender: a corrida do cenario 02 CONTINUA aqui. O
- * driver serializa as queries, nao as transacoes. A ordem vira SELECT-A,
+ * Detalhe que costuma surpreender: a corrida do cenário 02 CONTINUA aqui. O
+ * driver serializa as queries, não as transações. A ordem vira SELECT-A,
  * SELECT-B, UPDATE-A, UPDATE-B, e os dois leem o mesmo saldo velho do mesmo
- * jeito. Perde-se o desempenho e nao se ganha a correcao.
+ * jeito. Perde-se o desempenho e não se ganha a correção.
  */
 import { performance } from 'node:perf_hooks';
 import {
@@ -39,10 +39,10 @@ import type { OpcoesCenario, ResultadoCenario } from '../tipos.js';
 export const NOME = '05-conexao-compartilhada';
 const CONTA_ALVO = 1;
 
-/** Latencia por query, em ms. Simula um banco na rede em vez de em loopback. */
+/** Latência por query, em ms. Simula um banco na rede em vez de em loopback. */
 export const LATENCIA_DE_REDE_MS = 2;
 
-/** Aceita Client ou Pool: os dois tem `query`. A diferenca esta em quem chama. */
+/** Aceita Client ou Pool: os dois têm `query`. A diferença está em quem chama. */
 interface Executor {
   query(texto: string, valores?: unknown[]): Promise<{ rows: any[] }>;
 }
@@ -61,7 +61,7 @@ async function saque(executor: Executor, contaId: number, valor: number): Promis
   ]);
 }
 
-/** Dispara `operacoes` saques com `concorrencia` promises puxando de uma fila. */
+/** Dispara `operações` saques com `concorrência` promises puxando de uma fila. */
 async function rodarCarga(
   executor: Executor,
   opts: OpcoesCenario,
@@ -97,16 +97,16 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
   const saldoInicial = await somaSaldos(poolDeApoio);
   const erros = new ContadorDeErros();
 
-  // -------- fase A: um Client so, compartilhado por todas as promises --------
-  // BUG INTENCIONAL: Client unico onde deveria haver Pool. Toda a concorrencia
-  // do processo passa por um cano de uma via so.
+  // -------- fase A: um Client só, compartilhado por todas as promises --------
+  // BUG INTENCIONAL: Client único onde deveria haver Pool. Toda a concorrência
+  // do processo passa por um cano de uma via só.
   const client = criarClient(cfg);
   await client.connect();
   const faseA = await rodarCarga(client as unknown as Executor, opts, erros);
   const invariante = await verificarInvariante(poolDeApoio, saldoInicial);
   await client.end();
 
-  // -------- fase B: a mesma carga, com Pool de verdade, so para comparar -----
+  // -------- fase B: a mesma carga, com Pool de verdade, só para comparar -----
   await resetar(poolDeApoio, cfg);
   const pool = criarPool(opts.concorrencia, cfg);
   await aquecerPool(pool, opts.concorrencia);
@@ -139,9 +139,9 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
 
 if (ehPrincipal(import.meta.url)) {
   const cfg = lerConfig();
-  titulo('CENARIO 05 - a conexao compartilhada');
+  titulo('CENÁRIO 05 - a conexão compartilhada');
   console.log(`  ${cfg.operacoes} saques com ${cfg.concorrencia} promises concorrentes,`);
-  console.log('  primeiro num Client unico, depois num Pool. Mesma carga, mesmo codigo.');
+  console.log('  primeiro num Client único, depois num Pool. Mesma carga, mesmo código.');
 
   const r = await executar({
     operacoes: cfg.operacoes,
@@ -152,11 +152,11 @@ if (ehPrincipal(import.meta.url)) {
   secao('a fila escondida dentro do driver');
   console.log(`  Client compartilhado ... ${r.extra?.msClientCompartilhado} ms  (${r.extra?.throughputClientCompartilhado} ops/s)`);
   console.log(`  Pool com max=${cfg.concorrencia} ......... ${r.extra?.msComPool} ms  (${r.extra?.throughputComPool} ops/s)`);
-  console.log(`  o Client foi ${r.extra?.vezesMaisLento}x mais lento com a MESMA concorrencia declarada.`);
+  console.log(`  o Client foi ${r.extra?.vezesMaisLento}x mais lento com a MESMA concorrência declarada.`);
 
   imprimirResumo(r, [
-    'Ninguem escreveu um laco sequencial. A fila e do driver, uma por conexao.',
-    'Repare que a divergencia continua diferente de zero: serializar a conexao',
-    'nao serializa a transacao, entao o lost update do cenario 02 sobrevive.',
+    'Ninguém escreveu um laço sequencial. A fila é do driver, uma por conexão.',
+    'Repare que a divergência continua diferente de zero: serializar a conexão',
+    'não serializa a transação, então o lost update do cenário 02 sobrevive.',
   ]);
 }

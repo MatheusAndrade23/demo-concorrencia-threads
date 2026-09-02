@@ -1,17 +1,17 @@
 /**
- * CENARIO 07 - o mesmo trabalho, agora em worker_threads   (Bloco B)
+ * CENÁRIO 07 - o mesmo trabalho, agora em worker_threads   (Bloco B)
  *
- * Pega o laco de sha256 do cenario 04 e distribui entre N workers. Duas coisas
+ * Pega o laço de sha256 do cenário 04 e distribui entre N workers. Duas coisas
  * mudam de uma vez:
  *
- *   1. o tempo total CAI conforme se adiciona worker, porque agora sao nucleos
- *      fisicos diferentes trabalhando ao mesmo tempo;
+ *   1. o tempo total CAI conforme se adiciona worker, porque agora são núcleos
+ *      físicos diferentes trabalhando ao mesmo tempo;
  *   2. o heartbeat do event loop principal continua batendo, porque a thread
- *      principal nao esta fazendo hash nenhum, so esperando mensagem.
+ *      principal não está fazendo hash nenhum, só esperando mensagem.
  *
- * E o contraponto exato do cenario 04. La, `async` nao comprou paralelismo
- * nenhum. Aqui, thread de verdade compra. A licao e que async/await serve para
- * esperar I/O, e worker_threads serve para gastar CPU: trocar um pelo outro nao
+ * E o contraponto exato do cenário 04. Lá, `async` não comprou paralelismo
+ * nenhum. Aqui, thread de verdade compra. A lição é que async/await serve para
+ * esperar I/O, e worker_threads serve para gastar CPU: trocar um pelo outro não
  * resolve nada.
  */
 import { performance } from 'node:perf_hooks';
@@ -25,7 +25,7 @@ import type { ParamsCpu, ResultadoCpu } from '../workers/cpu-worker.js';
 
 export const NOME = '07-worker-cpu';
 
-/** O mesmo total de rodadas do cenario 04, para a comparacao ser justa. */
+/** O mesmo total de rodadas do cenário 04, para a comparação ser justa. */
 export const RODADAS_TOTAIS = 700_000_000;
 
 export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
@@ -61,7 +61,7 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
     concluidas,
     ms,
     throughput: (concluidas / ms) * 1000,
-    // nenhum dinheiro se move: o que se mede aqui e tempo
+    // nenhum dinheiro se move: o que se mede aqui é tempo
     invariante: montarInvariante(0, 0, 0),
     erros,
     porTrabalhador: ok.map((x) => x.resultado.rodadas),
@@ -77,11 +77,11 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
 }
 
 if (ehPrincipal(import.meta.url)) {
-  titulo('CENARIO 07 - o mesmo hash do cenario 04, agora em workers');
+  titulo('CENÁRIO 07 - o mesmo hash do cenário 04, agora em workers');
   console.log(`  ${RODADAS_TOTAIS.toLocaleString('pt-BR')} rodadas de sha256, divididas entre N workers.`);
-  console.log(`  nucleos disponiveis: ${(await import('node:os')).availableParallelism()}`);
+  console.log(`  núcleos disponíveis: ${(await import('node:os')).availableParallelism()}`);
 
-  secao('tempo x numero de workers');
+  secao('tempo x número de workers');
   console.log('  workers |     tempo |   hashes/s | maior lacuna do loop');
   console.log('  ' + '-'.repeat(58));
 
@@ -105,14 +105,14 @@ if (ehPrincipal(import.meta.url)) {
   const um = medidas[0]!;
   const oito = medidas[medidas.length - 1]!;
   console.log('');
-  console.log(`  de 1 para ${oito.concorrencia} workers: ${(um.ms / oito.ms).toFixed(2)}x mais rapido`);
+  console.log(`  de 1 para ${oito.concorrencia} workers: ${(um.ms / oito.ms).toFixed(2)}x mais rápido`);
 
   imprimirResumo(oito, [
-    'Compare com o cenario 04: la a maior lacuna do event loop passou de 1700 ms.',
-    'Aqui a thread principal so espera mensagem, entao ela continua respondendo.',
-    'Adicionar worker acelera trabalho de CPU. Adicionar async, nao.',
+    'Compare com o cenário 04: lá a maior lacuna do event loop passou de 1700 ms.',
+    'Aqui a thread principal só espera mensagem, então ela continua respondendo.',
+    'Adicionar worker acelera trabalho de CPU. Adicionar async, não.',
   ]);
-  console.log('  rodadas por worker na ultima medida:');
+  console.log('  rodadas por worker na última medida:');
   barras(oito.porTrabalhador, 'w');
   console.log('  ' + distribuicao(oito.porTrabalhador) + '\n');
 }

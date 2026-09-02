@@ -1,46 +1,46 @@
 /**
- * Tipos compartilhados entre os cenarios, o runner de benchmark e os graficos.
- * Todo cenario devolve o MESMO formato, para que o benchmark trate "sequencial"
+ * Tipos compartilhados entre os cenários, o runner de benchmark e os gráficos.
+ * Todo cenário devolve o MESMO formato, para que o benchmark trate "sequencial"
  * e "worker-sab-corrida" pela mesma porta.
  */
 
 /**
  * A invariante do projeto.
  *
- * Um saque diminui a soma dos saldos DE PROPOSITO, entao comparar o total final
- * com o total inicial cru acusaria perda onde nao houve. A ancora e o razao: a
+ * Um saque diminui a soma dos saldos DE PROPÓSITO, então comparar o total final
+ * com o total inicial cru acusaria perda onde não houve. A âncora é o razão: a
  * tabela `movimentos` registra tudo o que o banco de fato movimentou.
  *
  *     esperado    = saldoInicial + SUM(movimentos.valor)
- *     divergencia = observado - esperado
+ *     divergência = observado - esperado
  *
- * Funciona para os tres formatos de cenario:
- *   saque         -> um movimento negativo por operacao, esperado cai
- *   transferencia -> um movimento negativo e um positivo, esperado nao muda
- *   contador SAB  -> "movimentos" e a soma dos incrementos que os workers dizem
- *                    ter feito, "observado" e o valor final do Int32Array
+ * Funciona para os tres formatos de cenário:
+ *   saque         -> um movimento negativo por operação, esperado cai
+ *   transferência -> um movimento negativo e um positivo, esperado não muda
+ *   contador SAB  -> "movimentos" é a soma dos incrementos que os workers dizem
+ *                    ter feito, "observado" é o valor final do Int32Array
  *
- * divergencia > 0  o banco pagou e nao debitou (o classico do lost update)
- * divergencia < 0  dinheiro sumiu das contas
+ * divergência > 0  o banco pagou e não debitou (o clássico do lost update)
+ * divergência < 0  dinheiro sumiu das contas
  */
 export interface Invariante {
-  /** soma dos saldos logo apos o seed */
+  /** soma dos saldos logo após o seed */
   saldoInicial: number;
   /** SUM(movimentos.valor): negativo quando saiu dinheiro */
   movimentos: number;
   /** saldoInicial + movimentos, o que a contabilidade manda */
   esperado: number;
-  /** SUM(saldo) de verdade, no fim do cenario */
+  /** SUM(saldo) de verdade, no fim do cenário */
   observado: number;
   /** observado - esperado. Diferente de zero = invariante quebrada. */
   divergencia: number;
-  /** modulo da divergencia. E a metrica principal dos graficos. */
+  /** módulo da divergência. E a métrica principal dos gráficos. */
   perdido: number;
 }
 
-/** Uma amostra da serie temporal do cenario 10 (leitura suja). */
+/** Uma amostra da série temporal do cenário 10 (leitura suja). */
 export interface Amostra {
-  /** milissegundos desde o inicio do cenario */
+  /** milissegundos desde o início do cenário */
   t: number;
   valor: number;
 }
@@ -48,41 +48,41 @@ export interface Amostra {
 export interface ResultadoCenario {
   cenario: string;
   concorrencia: number;
-  /** operacoes pedidas */
+  /** operações pedidas */
   operacoes: number;
-  /** operacoes que terminaram sem excecao */
+  /** operações que terminaram sem exceção */
   concluidas: number;
 
   /** tempo de parede da fase medida, em ms (perf_hooks) */
   ms: number;
-  /** operacoes concluidas por segundo */
+  /** operações concluídas por segundo */
   throughput: number;
 
   invariante: Invariante;
 
-  /** contagem de erros por SQLSTATE (ou pseudo-codigo, ver classificarErro) */
+  /** contagem de erros por SQLSTATE (ou pseudo-código, ver classificarErro) */
   erros: Record<string, number>;
 
-  /** operacoes concluidas por promise/worker, na ordem dos indices */
+  /** operações concluídas por promise/worker, na ordem dos índices */
   porTrabalhador: number[];
 
   /** maior intervalo entre duas batidas do heartbeat, onde faz sentido medir */
   maiorLacunaEventLoopMs?: number;
 
-  /** serie temporal, usada pelo cenario 10 */
+  /** série temporal, usada pelo cenário 10 */
   serie?: Amostra[];
 
-  /** campos de um cenario so, que viram colunas extras no CSV */
+  /** campos de um cenário só, que viram colunas extras no CSV */
   extra?: Record<string, number | string | boolean>;
 }
 
-/** Opcoes que o benchmark passa para qualquer cenario. */
+/** Opções que o benchmark passa para qualquer cenário. */
 export interface OpcoesCenario {
   operacoes: number;
   concorrencia: number;
   valorSaque: number;
-  /** cenario 11: liga o console.log dentro da secao critica */
+  /** cenário 11: liga o console.log dentro da seção crítica */
   logNaSecaoCritica?: boolean;
-  /** silencia a saida propria do cenario quando ele roda dentro do benchmark */
+  /** silencia a saída própria do cenário quando ele roda dentro do benchmark */
   silencioso?: boolean;
 }

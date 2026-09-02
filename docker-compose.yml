@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: demo
       POSTGRES_DB: banco
     ports:
-      # 5433 no host para nao brigar com um Postgres ja instalado na maquina
+      # 5433 no host para não brigar com um Postgres já instalado na máquina
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -18,10 +18,10 @@ services:
       retries: 20
     command:
       - postgres
-      # os cenarios abrem varios pools ao mesmo tempo; o padrao de 100 aperta
+      # os cenários abrem vários pools ao mesmo tempo; o padrão de 100 aperta
       - -c
       - max_connections=300
-      # detecta o deadlock do cenario 09 rapido, para nao travar a apresentacao
+      # detecta o deadlock do cenário 09 rápido, para não travar a apresentação
       - -c
       - deadlock_timeout=200ms
       - -c

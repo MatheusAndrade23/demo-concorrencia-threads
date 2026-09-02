@@ -1,14 +1,14 @@
 /**
- * Saida legivel de um cenario no terminal.
+ * Saída legível de um cenário no terminal.
  *
- * Cada cenario roda sozinho e imprime o proprio resumo, sem depender do runner.
- * A formatacao mora aqui para nao ser copiada onze vezes.
+ * Cada cenário roda sozinho e imprime o próprio resumo, sem depender do runner.
+ * A formatação mora aqui para não ser copiada onze vezes.
  */
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import type { ResultadoCenario } from './tipos.js';
 
-/** true quando o arquivo foi chamado direto (npx tsx src/cenarios/xx.ts). */
+/** true quando o arquivo foi chamado direto (npx tsx src/cenários/xx.ts). */
 export function ehPrincipal(urlDoModulo: string): boolean {
   const argv = process.argv[1];
   if (argv === undefined) return false;
@@ -37,7 +37,7 @@ export function dinheiro(v: number): string {
   return v.toFixed(2);
 }
 
-/** min / max / desvio das operacoes por trabalhador, para mostrar desigualdade. */
+/** min / max / desvio das operações por trabalhador, para mostrar desigualdade. */
 export function distribuicao(porTrabalhador: number[]): string {
   if (porTrabalhador.length === 0) return 'sem dados';
   const min = Math.min(...porTrabalhador);
@@ -46,11 +46,11 @@ export function distribuicao(porTrabalhador: number[]): string {
   const variancia =
     porTrabalhador.reduce((a, b) => a + (b - media) ** 2, 0) / porTrabalhador.length;
   return (
-    `min ${min} / max ${max} / media ${media.toFixed(1)} / desvio ${Math.sqrt(variancia).toFixed(2)}`
+    `min ${min} / max ${max} / média ${media.toFixed(1)} / desvio ${Math.sqrt(variancia).toFixed(2)}`
   );
 }
 
-/** Histograma horizontal simples, util quando ha poucos trabalhadores. */
+/** Histograma horizontal simples, útil quando há poucos trabalhadores. */
 export function barras(porTrabalhador: number[], rotulo = 'w'): void {
   if (porTrabalhador.length === 0 || porTrabalhador.length > 32) return;
   const max = Math.max(...porTrabalhador, 1);
@@ -62,22 +62,22 @@ export function barras(porTrabalhador: number[], rotulo = 'w'): void {
 
 export function imprimirResumo(r: ResultadoCenario, notas: string[] = []): void {
   const inv = r.invariante;
-  secao(`${r.cenario}   concorrencia ${r.concorrencia} / ${r.operacoes} operacoes`);
+  secao(`${r.cenario}   concorrência ${r.concorrencia} / ${r.operacoes} operações`);
   linha('tempo', `${r.ms.toFixed(2)} ms`);
   linha('throughput', `${r.throughput.toFixed(1)} ops/s`);
-  linha('concluidas', `${r.concluidas} de ${r.operacoes}`);
+  linha('concluídas', `${r.concluidas} de ${r.operacoes}`);
   console.log('');
   linha('saldo inicial', dinheiro(inv.saldoInicial));
-  linha('movimentos (razao)', dinheiro(inv.movimentos));
+  linha('movimentos (razão)', dinheiro(inv.movimentos));
   linha('esperado', `${dinheiro(inv.esperado)}   (inicial + movimentos)`);
   linha('observado', dinheiro(inv.observado));
 
   if (inv.divergencia > 0) {
-    linha('DIVERGENCIA', `+${dinheiro(inv.divergencia)}  pago e nunca debitado`);
+    linha('DIVERGÊNCIA', `+${dinheiro(inv.divergencia)}  pago e nunca debitado`);
   } else if (inv.divergencia < 0) {
-    linha('DIVERGENCIA', `${dinheiro(inv.divergencia)}  sumiu das contas`);
+    linha('DIVERGÊNCIA', `${dinheiro(inv.divergencia)}  sumiu das contas`);
   } else {
-    linha('divergencia', '0.00  (invariante preservada)');
+    linha('divergência', '0.00  (invariante preservada)');
   }
 
   const erros = Object.entries(r.erros);

@@ -1,16 +1,16 @@
 /**
- * CENARIO 06 - corrida em memoria com worker_threads   (Bloco B)
+ * CENÁRIO 06 - corrida em memória com worker_threads   (Bloco B)
  *
- * Agora sim ha paralelismo de verdade: N workers, cada um numa thread do
+ * Agora sim há paralelismo de verdade: N workers, cada um numa thread do
  * sistema operacional, incrementando o MESMO Int32Array sobre um
  * SharedArrayBuffer. Nenhum banco de dados envolvido.
  *
- * `contador[0] = contador[0] + 1` sao tres operacoes de maquina: carrega da
- * memoria, soma, escreve de volta. Dois nucleos que carregam o mesmo valor ao
+ * `contador[0] = contador[0] + 1` são tres operações de máquina: carrega da
+ * memória, soma, escreve de volta. Dois núcleos que carregam o mesmo valor ao
  * mesmo tempo escrevem o mesmo resultado, e um dos dois incrementos evapora.
  *
- * O contraste com o cenario 02 e a tese da apresentacao: la o intervalo perigoso
- * era um `await`, aqui e uma instrucao de maquina. O bug e o mesmo lost update.
+ * O contraste com o cenário 02 é a tese da apresentação: lá o intervalo perigoso
+ * era um `await`, aqui é uma instrução de máquina. O bug é o mesmo lost update.
  */
 import { performance } from 'node:perf_hooks';
 import { lerConfig, montarInvariante } from '../db.js';
@@ -30,7 +30,7 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
   const workers = Math.max(2, opts.concorrencia);
   const iteracoes = Math.max(1, Math.round(opts.operacoes));
 
-  // 4 bytes: um unico Int32 compartilhado entre todas as threads
+  // 4 bytes: um único Int32 compartilhado entre todas as threads
   const sab = new SharedArrayBuffer(4);
   const contador = new Int32Array(sab);
   contador[0] = 0;
@@ -54,7 +54,7 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
   for (const f of falhas) erros[f.erro.sqlstate] = (erros[f.erro.sqlstate] ?? 0) + 1;
 
   // saldoInicial 0, "movimentos" = incrementos que os workers dizem ter feito,
-  // "observado" = o que sobrou no Int32Array. Mesma conta dos cenarios de banco.
+  // "observado" = o que sobrou no Int32Array. Mesma conta dos cenários de banco.
   const invariante = montarInvariante(0, prometido, observado);
 
   return {
@@ -78,18 +78,18 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
 
 if (ehPrincipal(import.meta.url)) {
   const workers = Math.max(2, lerConfig().concorrencia >= 4 ? 4 : 2);
-  titulo('CENARIO 06 - lost update em memoria, com threads de verdade');
+  titulo('CENÁRIO 06 - lost update em memória, com threads de verdade');
   console.log(`  ${workers} workers x ${ITERACOES_POR_WORKER.toLocaleString('pt-BR')} incrementos`);
   console.log('  no mesmo Int32Array, sem Atomics.');
 
-  // roda tres vezes: o valor final nunca bate e nunca se repete
+  // roda três vezes: o valor final nunca bate e nunca se repete
   for (let rep = 1; rep <= 3; rep++) {
     const r = await executar({
       operacoes: ITERACOES_POR_WORKER,
       concorrencia: workers,
       valorSaque: 0,
     });
-    console.log(`\n  execucao ${rep}`);
+    console.log(`\n  execução ${rep}`);
     imprimirResumo(r, [
       `esperado ${r.invariante.esperado.toLocaleString('pt-BR')}, ` +
         `contador ficou em ${r.invariante.observado.toLocaleString('pt-BR')} ` +
@@ -101,5 +101,5 @@ if (ehPrincipal(import.meta.url)) {
       console.log('  ' + distribuicao(r.porTrabalhador));
     }
   }
-  console.log('\n  > Rode de novo: o numero muda toda vez. Bug de corrida nao e deterministico.\n');
+  console.log('\n  > Rode de novo: o número muda toda vez. Bug de corrida não é determinístico.\n');
 }

@@ -1,8 +1,8 @@
 /**
- * Como os workers recebem parametros e devolvem resultado.
+ * Como os workers recebem parâmetros e devolvem resultado.
  *
- * Entrada por `workerData`, saida por `parentPort.postMessage`. O pai espera o
- * evento `exit`, entao um worker que morre antes de responder vira um resultado
+ * Entrada por `workerData`, saída por `parentPort.postMessage`. O pai espera o
+ * evento `exit`, então um worker que morre antes de responder vira um resultado
  * `{ ok: false }` em vez de derrubar o benchmark: a promise NUNCA rejeita.
  */
 import { Worker } from 'node:worker_threads';
@@ -10,12 +10,12 @@ import { classificarErro } from '../db.js';
 import type { Config } from '../db.js';
 
 export interface EntradaWorker<P> {
-  /** indice do worker, usado na distribuicao de operacoes por trabalhador */
+  /** índice do worker, usado na distribuição de operações por trabalhador */
   id: number;
-  /** o worker abre o PROPRIO Pool a partir daqui (menos no cenario 05) */
+  /** o worker abre o PRÓPRIO Pool a partir daqui (menos no cenário 05) */
   config: Config;
   params: P;
-  /** memoria compartilhada, so nos cenarios que precisam (06) */
+  /** memória compartilhada, só nos cenários que precisam (06) */
   sab?: SharedArrayBuffer;
 }
 
@@ -53,14 +53,14 @@ function umWorker<P, R>(url: URL, entrada: EntradaWorker<P>): Promise<SaidaWorke
         id: entrada.id,
         erro: {
           sqlstate: 'WORKER_SEM_RESPOSTA',
-          mensagem: `worker ${entrada.id} saiu com codigo ${codigo} sem responder`,
+          mensagem: `worker ${entrada.id} saiu com código ${codigo} sem responder`,
         },
       });
     });
   });
 }
 
-/** Ajuda os cenarios a separarem o joio do trigo sem repetir o filtro. */
+/** Ajuda os cenários a separarem o joio do trigo sem repetir o filtro. */
 export function separar<R>(saidas: SaidaWorker<R>[]): {
   ok: { id: number; resultado: R }[];
   falhas: { id: number; erro: { sqlstate: string; mensagem: string } }[];
