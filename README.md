@@ -82,7 +82,7 @@ Existem dois comandos, e eles servem para coisas diferentes.
 ### Os 11 cenários na sequência, com a saída de apresentação
 
 ```bash
-npm run todos
+npm run all
 ```
 
 Roda de 1 a 11 na ordem, cada um num processo separado, com a mesma saída que
@@ -91,11 +91,11 @@ com uma tabela de tempo e status por cenário. É o comando para ensaiar a
 apresentação e para conferir que tudo funciona depois de um `git clone`.
 
 ```bash
-npm run todos -- --so 02,06,11     # só estes, por prefixo
-npm run todos -- --bloco A         # só o bloco A (1 a 5)
-npm run todos -- --bloco B         # só o bloco B (6 a 11)
-npm run todos -- --parar-no-erro   # interrompe no primeiro que falhar
-npm run todos 2>/dev/null          # esconde o barulho de depuração do cenário 11
+npm run all -- --only 02,06,11   # só estes, por prefixo
+npm run all -- --block A         # só o bloco A (1 a 5)
+npm run all -- --block B         # só o bloco B (6 a 11)
+npm run all -- --fail-fast       # interrompe no primeiro que falhar
+npm run all 2>/dev/null          # esconde o barulho de depuração do cenário 11
 ```
 
 Por padrão ele segue mesmo se um cenário falhar, e lista as falhas no resumo do
@@ -104,23 +104,23 @@ fim. O código de saída é 1 se algum cenário falhou.
 ### A medição, com repetições e gráficos
 
 ```bash
-caffeinate -i npm run bench -- --cenarios todos --repeticoes 10
-npm run graficos
+caffeinate -i npm run bench -- --scenarios all --repetitions 10
+npm run charts
 ```
 
-Este é o que gera os CSV e os SVG. Ao contrário do `npm run todos`, ele silencia
+Este é o que gera os CSV e os SVG. Ao contrário do `npm run all`, ele silencia
 a saída dos cenários e mede.
 
 Opções do runner:
 
 | Opção | Padrão | O que faz |
 |---|---|---|
-| `--cenarios` | `todos` | lista separada por vírgula, ou `todos`, `A`, `B`. Aceita prefixo: `--cenarios 02,08` |
-| `--concorrencia` | o que cada cenário define | ex: `1,2,4,8,16,32,64` |
-| `--repeticoes` | `10` | uma linha no CSV por repetição, nunca só a média |
-| `--operacoes` | por cenário | número de saques; cenários de CPU e de memória ignoram, porque a escala deles é outra |
-| `--sem-warmup` | desligado | não descarta a primeira execução de cada série |
-| `--saida` | `resultados` | diretório de saída |
+| `--scenarios` | `all` | lista separada por vírgula, ou `all`, `A`, `B`. Aceita prefixo: `--scenarios 02,08` |
+| `--concurrency` | o que cada cenário define | ex: `1,2,4,8,16,32,64` |
+| `--repetitions` | `10` | uma linha no CSV por repetição, nunca só a média |
+| `--operations` | por cenário | número de saques; cenários de CPU e de memória ignoram, porque a escala deles é outra |
+| `--no-warmup` | desligado | não descarta a primeira execução de cada série |
+| `--output` | `resultados` | diretório de saída |
 
 O runner descarta uma execução de warm-up antes de cada série, recria o estado do
 banco antes de **cada** repetição, e nenhum cenário aborta o benchmark: uma
@@ -131,7 +131,7 @@ máquina esteve suspensa, então um notebook que dorme no meio da execução pro
 repetições de vinte minutos que não medem nada:
 
 ```bash
-caffeinate -i npm run bench -- --cenarios todos --repeticoes 10
+caffeinate -i npm run bench -- --scenarios all --repetitions 10
 ```
 
 ### O que é gerado em `resultados/`
@@ -348,9 +348,9 @@ src/workers/cpu-worker.ts
 src/workers/banco-worker.ts
 src/workers/deadlock-worker.ts
 src/workers/transferencia-worker.ts
-src/todos.ts                  roda os 11 cenários na sequência
+src/all.ts                  roda os 11 cenários na sequência
 src/benchmark.ts
-src/graficos.ts
+src/charts.ts
 resultados/                   CSV e SVG gerados
 slides/notas.md
 ```

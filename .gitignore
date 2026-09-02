@@ -6,5 +6,5 @@ dist/
 # os resultados sao entregaveis e ficam versionados; o log bruto da execucao nao
 resultados/*.log
 
-# specs intermediarios do vega-lite; "npm run graficos" regenera a partir do CSV
+# specs intermediarios do vega-lite; "npm run charts" regenera a partir do CSV
 resultados/*.vl.json
