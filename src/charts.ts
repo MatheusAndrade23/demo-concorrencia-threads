@@ -68,6 +68,34 @@ function lerCsv(caminho: string): Linha[] {
 
 const num = (v: string | undefined): number => Number(v ?? 0);
 
+/**
+ * O nome do cenário é um identificador: vive no CSV, nos filtros deste arquivo e
+ * no nome do arquivo em src/cenarios/. Por isso continua sem acento e com hífen.
+ * Para a tela, porém, "03-promise-orfa" é ruim. Este mapa traduz identificador
+ * em rótulo, e a tradução acontece depois de todo filtro, nunca antes.
+ */
+const ROTULO: Record<string, string> = {
+  '01-sequencial': '01 sequencial',
+  '02-corrida-sem-thread': '02 corrida sem thread',
+  '03-promise-orfa': '03 promise órfã',
+  '04-event-loop-travado': '04 event loop travado',
+  '05-conexao-compartilhada': '05 conexão compartilhada',
+  '06-worker-sab-corrida': '06 corrida em SharedArrayBuffer',
+  '07-worker-cpu': '07 hash em workers',
+  '08-worker-banco': '08 saque em workers',
+  '09-deadlock': '09 deadlock',
+  '10-leitura-suja': '10 leitura suja',
+  '11-heisenbug-com-log': '11 heisenbug com log',
+  '11-heisenbug-sem-log': '11 heisenbug sem log',
+};
+
+/** Identificador do cenário -> rótulo legível. Sem entrada no mapa, devolve o id. */
+function rotulo(cenario: string | undefined): string {
+  const id = cenario ?? '';
+  return ROTULO[id] ?? id;
+}
+
+
 interface Grafico {
   arquivo: string;
   titulo: string;
@@ -111,7 +139,7 @@ export function construirGraficos(): Grafico[] {
 
   // ------------------------------------------------------ 1. throughput
   const throughput = resultados.filter(deBanco).map((l) => ({
-    cenario: l.cenario,
+    cenario: rotulo(l.cenario),
     concorrencia: num(l.concorrencia),
     throughput: num(l.throughput),
   }));
@@ -143,7 +171,7 @@ export function construirGraficos(): Grafico[] {
 
   // -------------------------------------------- 2. dinheiro perdido + dispersão
   const perdido = resultados.filter(deBanco).map((l) => ({
-    cenario: l.cenario,
+    cenario: rotulo(l.cenario),
     concorrencia: num(l.concorrencia),
     perdido: num(l.perdido),
   }));
@@ -164,7 +192,7 @@ export function construirGraficos(): Grafico[] {
             encoding: {
               x: { field: 'concorrencia', type: 'quantitative', scale: { type: 'log', base: 2 } },
               y: { field: 'perdido', type: 'quantitative' },
-              color: { field: 'cenario', type: 'nominal' },
+              color: { field: 'cenario', type: 'nominal', legend: { title: 'cenário' } },
             },
           },
           {
@@ -172,7 +200,7 @@ export function construirGraficos(): Grafico[] {
             encoding: {
               x: { field: 'concorrencia', type: 'quantitative', scale: { type: 'log', base: 2 } },
               y: { aggregate: 'mean', field: 'perdido', type: 'quantitative' },
-              color: { field: 'cenario', type: 'nominal' },
+              color: { field: 'cenario', type: 'nominal', legend: { title: 'cenário' } },
             },
           },
         ],
@@ -199,7 +227,7 @@ export function construirGraficos(): Grafico[] {
     const valores = dist
       .filter((l) => num(l.concorrencia) === maiorPorCenario.get(l.cenario ?? '') && l.repeticao === '1')
       .map((l) => ({
-        cenario: l.cenario,
+        cenario: rotulo(l.cenario),
         trabalhador: num(l.trabalhador),
         operacoes: num(l.operacoes),
       }));
