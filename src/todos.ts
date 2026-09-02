@@ -1,0 +1,179 @@
+/**
+ * Roda os 11 cenarios em sequencia, com a saida de apresentacao de cada um.
+ *
+ *   npm run todos                  todos, na ordem
+ *   npm run todos -- --so 02,06    so os cenarios pedidos
+ *   npm run todos -- --bloco A     so o bloco A (1 a 5) ou B (6 a 11)
+ *   npm run todos -- --parar-no-erro
+ *
+ * Cada cenario roda num processo separado, com stdio herdado, exatamente como
+ * se voce tivesse chamado `npx tsx src/cenarios/02-corrida-sem-thread.ts` na
+ * mao. Isso mantem a saida identica a do cenario isolado e garante que um
+ * cenario nao contamine o proximo com estado de modulo ou worker vivo.
+ *
+ * Para medir e gerar graficos, o comando e outro: `npm run bench`.
+ */
+import { spawnSync } from 'node:child_process';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { performance } from 'node:perf_hooks';
+import { criarPool, fecharPool, lerConfig, verificarConexao } from './db.js';
+import { secao, titulo } from './relatorio.js';
+
+const PASTA = join('src', 'cenarios');
+const TSX = join('node_modules', '.bin', 'tsx');
+
+/** Os cenarios 1 a 5 sao o bloco A, 6 a 11 sao o bloco B. */
+function blocoDe(arquivo: string): 'A' | 'B' {
+  return Number(arquivo.slice(0, 2)) <= 5 ? 'A' : 'B';
+}
+
+interface Argumentos {
+  so?: string[];
+  bloco?: 'A' | 'B';
+  pararNoErro: boolean;
+}
+
+function lerArgumentos(argv: string[]): Argumentos {
+  const args: Argumentos = { pararNoErro: false };
+  for (let i = 0; i < argv.length; i++) {
+    const chave = argv[i];
+    const valor = argv[i + 1];
+    switch (chave) {
+      case '--so':
+        args.so = (valor ?? '').split(',').map((p) => p.trim()).filter((p) => p !== '');
+        i++;
+        break;
+      case '--bloco': {
+        const b = (valor ?? '').trim().toUpperCase();
+        if (b !== 'A' && b !== 'B') {
+          console.error(`[ERRO] --bloco aceita A ou B, veio "${valor}".`);
+          process.exit(1);
+        }
+        args.bloco = b;
+        i++;
+        break;
+      }
+      case '--parar-no-erro':
+        args.pararNoErro = true;
+        break;
+      case '--ajuda':
+      case '-h':
+        console.log(AJUDA);
+        process.exit(0);
+        break;
+      default:
+        if (chave !== undefined && chave.startsWith('--')) {
+          console.error(`[ERRO] Opcao desconhecida: ${chave}\n${AJUDA}`);
+          process.exit(1);
+        }
+    }
+  }
+  return args;
+}
+
+const AJUDA = `
+Uso: npm run todos -- [opcoes]
+
+  --so LISTA          so estes cenarios, por prefixo. ex: --so 02,06,11
+  --bloco A|B         so o bloco A (sem thread) ou B (worker_threads)
+  --parar-no-erro     interrompe no primeiro cenario que falhar
+                      (o padrao e seguir e reportar no resumo do fim)
+`;
+
+interface Execucao {
+  arquivo: string;
+  bloco: 'A' | 'B';
+  ms: number;
+  codigo: number;
+}
+
+const args = lerArgumentos(process.argv.slice(2));
+
+let arquivos = readdirSync(PASTA)
+  .filter((f) => f.endsWith('.ts'))
+  .sort();
+
+if (args.bloco !== undefined) arquivos = arquivos.filter((f) => blocoDe(f) === args.bloco);
+if (args.so !== undefined) {
+  const pedidos = args.so;
+  const filtrados = arquivos.filter((f) => pedidos.some((p) => f.startsWith(p)));
+  const semCorrespondencia = pedidos.filter((p) => !arquivos.some((f) => f.startsWith(p)));
+  if (semCorrespondencia.length > 0) {
+    console.error(`\n[ERRO] Nao achei cenario para: ${semCorrespondencia.join(', ')}`);
+    console.error('       Disponiveis:');
+    for (const f of arquivos) console.error(`       ${f.replace(/\.ts$/, '')}`);
+    console.error('');
+    process.exit(1);
+  }
+  arquivos = filtrados;
+}
+
+if (arquivos.length === 0) {
+  console.error('\n[ERRO] Nenhum cenario selecionado.\n');
+  process.exit(1);
+}
+
+// checa o banco uma vez, aqui, para nao repetir a mesma falha 11 vezes
+const cfg = lerConfig();
+const pool = criarPool(2, cfg);
+await verificarConexao(pool);
+await fecharPool(pool);
+
+titulo(`RODANDO ${arquivos.length} CENARIOS`);
+console.log(`  banco: ${cfg.host}:${cfg.port}/${cfg.database}`);
+console.log(`  ${cfg.contas} contas x ${cfg.saldoInicial} de saldo inicial`);
+console.log('');
+console.log('  O cenario 11 escreve os logs de depuracao em stderr, porque o barulho');
+console.log('  dele e o proprio experimento. Para ver so os resumos:');
+console.log('    npm run todos 2>/dev/null');
+
+const execucoes: Execucao[] = [];
+const inicioGeral = performance.now();
+
+for (const [indice, arquivo] of arquivos.entries()) {
+  const nome = arquivo.replace(/\.ts$/, '');
+  const bloco = blocoDe(arquivo);
+  secao(`[${indice + 1}/${arquivos.length}]  bloco ${bloco}  ${nome}`);
+
+  const inicio = performance.now();
+  const r = spawnSync(TSX, [join(PASTA, arquivo)], { stdio: 'inherit' });
+  const ms = performance.now() - inicio;
+  const codigo = r.status ?? 1;
+
+  execucoes.push({ arquivo: nome, bloco, ms, codigo });
+
+  if (codigo !== 0) {
+    console.error(`\n  [FALHOU] ${nome} saiu com codigo ${codigo}.`);
+    if (args.pararNoErro) {
+      console.error('  --parar-no-erro ligado, interrompendo aqui.\n');
+      break;
+    }
+    console.error('  Seguindo para o proximo. Use --parar-no-erro para interromper.\n');
+  }
+}
+
+const msGeral = performance.now() - inicioGeral;
+const falhas = execucoes.filter((e) => e.codigo !== 0);
+
+titulo('RESUMO');
+console.log(`  ${'cenario'.padEnd(28)}${'bloco'.padEnd(8)}${'tempo'.padStart(10)}   status`);
+console.log('  ' + '-'.repeat(62));
+for (const e of execucoes) {
+  console.log(
+    `  ${e.arquivo.padEnd(28)}${e.bloco.padEnd(8)}${`${(e.ms / 1000).toFixed(1)} s`.padStart(10)}   ` +
+      (e.codigo === 0 ? 'ok' : `FALHOU (codigo ${e.codigo})`),
+  );
+}
+console.log('');
+console.log(`  ${execucoes.length} cenarios em ${(msGeral / 1000).toFixed(1)} s`);
+if (falhas.length > 0) {
+  console.log(`  ${falhas.length} falharam: ${falhas.map((f) => f.arquivo).join(', ')}`);
+}
+console.log('');
+console.log('  Para medir com repeticoes e gerar os graficos:');
+console.log('    caffeinate -i npm run bench -- --cenarios todos --repeticoes 10');
+console.log('    npm run graficos');
+console.log('');
+
+process.exit(falhas.length > 0 ? 1 : 0);
