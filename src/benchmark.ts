@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import { lerAmbiente, varreduraDeThreads } from './ambiente.js';
 import { criarPool, fecharPool, lerConfig, verificarConexao } from './db.js';
 import { desvio, ehPrincipal, media, secao, titulo } from './relatorio.js';
-import type { OpcoesCaso, ResultadoCaso } from './tipos.js';
+import type { Amostra, OpcoesCaso, ResultadoCaso } from './tipos.js';
 
 interface Modulo {
   executar: (o: OpcoesCaso) => Promise<ResultadoCaso>;
@@ -256,6 +256,26 @@ export function percentualPerdido(movimentos: number, perdido: number): number {
   return Number(((perdido / Math.abs(movimentos)) * 100).toFixed(4));
 }
 
+/**
+ * Guarda só os pontos em que o total observado mudou.
+ *
+ * O observador do caso 05 lê o total tão rápido quanto o Postgres responde, e
+ * 97% das amostras repetem o valor da anterior. O gráfico é uma linha
+ * `step-after`, que precisa dos pontos de mudança e de mais nada: a última
+ * amostra entra junto para o degrau final ter onde terminar. Sem isto o CSV
+ * passa de meio megabyte para desenhar exatamente a mesma figura.
+ */
+export function comprimirSerie(serie: Amostra[]): Amostra[] {
+  if (serie.length === 0) return [];
+  const guardadas: Amostra[] = [serie[0]!];
+  for (let i = 1; i < serie.length; i++) {
+    if (serie[i]!.valor !== serie[i - 1]!.valor) guardadas.push(serie[i]!);
+  }
+  const ultima = serie[serie.length - 1]!;
+  if (guardadas[guardadas.length - 1] !== ultima) guardadas.push(ultima);
+  return guardadas;
+}
+
 function linhaDoResultado(repeticao: number, r: ResultadoCaso): string {
   const errosTotal = Object.values(r.erros).reduce((a, b) => a + b, 0);
   return [
@@ -314,7 +334,6 @@ export async function rodar(args: Argumentos): Promise<void> {
   const resumo: string[] = [
     'caso,threads,repeticoes,ms_medio,ms_desvio,throughput_medio,perdido_medio,perdido_desvio,percentual_perdido_medio',
   ];
-  const distribuicao: string[] = ['caso,threads,repeticao,thread,operacoes'];
   const serie: string[] = ['caso,threads,repeticao,t_ms,total'];
 
   let falhas = 0;
@@ -367,13 +386,11 @@ export async function rodar(args: Argumentos): Promise<void> {
           percentuais.push(percentualPerdido(r.invariante.movimentos, r.invariante.perdido));
           vazoes.push(r.throughput);
 
-          r.porThread.forEach((n, i) => {
-            distribuicao.push([r.caso, r.threads, rep, i, n].map(csv).join(','));
-          });
-          // a série temporal só da primeira repetição: as dez juntas explodiriam
-          // o CSV sem acrescentar nada ao gráfico, que mostra uma execução
+          // a série temporal só da primeira repetição, e só nos pontos em que o
+          // valor mudou: as dez repetições juntas explodiriam o CSV sem
+          // acrescentar nada ao gráfico, que mostra uma execução
           if (rep === 1) {
-            for (const a of r.serie ?? []) {
+            for (const a of comprimirSerie(r.serie ?? [])) {
               serie.push([r.caso, r.threads, rep, a.t, a.valor].map(csv).join(','));
             }
           }
@@ -411,14 +428,12 @@ export async function rodar(args: Argumentos): Promise<void> {
 
   writeFileSync(join(args.saida, 'resultados.csv'), linhas.join('\n') + '\n');
   writeFileSync(join(args.saida, 'resumo.csv'), resumo.join('\n') + '\n');
-  writeFileSync(join(args.saida, 'distribuicao.csv'), distribuicao.join('\n') + '\n');
   writeFileSync(join(args.saida, 'serie-leitura-suja.csv'), serie.join('\n') + '\n');
   writeFileSync(join(args.saida, 'ambiente.json'), JSON.stringify(ambiente, null, 2) + '\n');
 
   secao('arquivos gravados');
   console.log(`  ${join(args.saida, 'resultados.csv')}          ${linhas.length - 1} linhas`);
   console.log(`  ${join(args.saida, 'resumo.csv')}              ${resumo.length - 1} linhas`);
-  console.log(`  ${join(args.saida, 'distribuicao.csv')}        ${distribuicao.length - 1} linhas`);
   console.log(`  ${join(args.saida, 'serie-leitura-suja.csv')}  ${serie.length - 1} linhas`);
   console.log(`  ${join(args.saida, 'ambiente.json')}`);
   if (falhas > 0) {

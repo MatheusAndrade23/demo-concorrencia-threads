@@ -15,6 +15,8 @@ e serve de régua para os outros.
 O produto do projeto são os arquivos em `resultados/`. Nenhum caso imprime
 demonstração no terminal: o que aparece na tela é o andamento da medição.
 
+A apresentação que acompanha o trabalho está em [`slides.pdf`](slides.pdf).
+
 **As duas perguntas que os gráficos respondem:**
 
 1. quanto se perde à medida que se adiciona thread, e o que acontece quando o
@@ -118,7 +120,7 @@ threads e nem a curva de tempo nem a de perda diriam nada sobre paralelismo.
 | 05 | [leitura suja](src/casos/05-worker-leitura-suja.ts) | nenhum (par de contas por thread) | não, mas o relatório mente |
 | 06 | [heisenbug](src/casos/06-worker-heisenbug.ts) | um `Int32Array` | depende do observador |
 
-### 01 — baseline sequencial
+### Caso 01: baseline sequencial
 
 Um saque por vez, em laço, na thread principal: `SELECT`, cálculo em JS,
 `UPDATE`. Nenhum worker sobe aqui. Roda só com uma thread, e ignora a varredura:
@@ -130,7 +132,7 @@ divergência fecha em zero e cada `SELECT` já enxerga o `UPDATE` anterior. E d�
 ponto de referência de tempo: **98 ms** para 200 saques, a linha tracejada azul do
 gráfico de tempo, contra a qual o caso 04 deve ser lido.
 
-### 02 — trabalho de CPU dividido entre threads
+### Caso 02: trabalho de CPU dividido entre threads
 
 O caso em que thread entrega exatamente o que promete. Um laço de mistura de
 inteiros, puro CPU, dividido em partes iguais entre N workers. Nenhum estado
@@ -148,7 +150,7 @@ O trabalho é aritmética de inteiros pura, sem alocar um byte
 alocador do OpenSSL e a curva ficaria achatada por um motivo que não tem nada a
 ver com paralelismo.
 
-### 03 — lost update em memória compartilhada
+### Caso 03: lost update em memória compartilhada
 
 N workers, cada um numa thread do sistema operacional, incrementando o **mesmo**
 `Int32Array` sobre um `SharedArrayBuffer`, sem `Atomics`.
@@ -161,7 +163,7 @@ tempo escrevem o mesmo resultado, e um dos dois incrementos evapora.
 73% com quatro**, e daí para cima entre 45% e 64%. Uma thread não perde nada
 porque não há com quem disputar; a partir de duas, a perda é imediata.
 
-### 04 — lost update no banco
+### Caso 04: lost update no banco
 
 O mesmo saque do caso 01, agora executado por N workers ao mesmo tempo na mesma
 conta, cada um com o próprio `Pool`. A janela perigosa é entre o `SELECT` e o
@@ -176,7 +178,7 @@ A curva de tempo é o contraponto do caso 02: melhora de 164 ms para 133 ms com
 duas threads e depois só piora, chegando a 442 ms com 20. Não é trabalho de CPU,
 é disputa pela mesma linha, e disputa não paraleliza.
 
-### 05 — o relatório que lê o meio da transferência
+### Caso 05: o relatório que lê o meio da transferência
 
 N workers transferem dinheiro entre pares de contas **sem transação**, enquanto a
 thread principal roda `SELECT SUM(saldo)` em laço, como faria um dashboard.
@@ -198,7 +200,7 @@ O seed deste caso é dimensionado pelo **maior** número de threads da varredura
 não pelo da execução: assim todos os pontos medem o mesmo sistema, com o mesmo
 total de dinheiro, e as séries temporais podem ser postas no mesmo gráfico.
 
-### 06 — o heisenbug
+### Caso 06: o heisenbug
 
 O caso 03 inteiro, com uma única diferença: uma flag que insere um `console.error`
 dentro da seção crítica, entre ler e escrever o `Int32Array`. O benchmark roda os
@@ -238,12 +240,13 @@ nada.
 | `ambiente.json` | CPU, threads de hardware, memória, Node, horário |
 | `resultados.csv` | uma linha por repetição |
 | `resumo.csv` | média e desvio padrão por caso e número de threads |
-| `distribuicao.csv` | operações concluídas por thread |
+| `serie-leitura-suja.csv` | o total lido pelo observador do caso 05, ao longo do tempo |
 
-`distribuicao.csv` não vira gráfico: a carga é dividida em partes iguais e toda
-thread conclui a sua, em todos os casos, então as barras sairiam idênticas. O
-arquivo continua sendo gravado como evidência dessa premissa, que é o que
-sustenta toda comparação de tempo.
+As operações concluídas por thread ficam na coluna `ops_por_thread` de
+`resultados.csv`, uma linha por execução. Elas não viram gráfico: a carga é
+dividida em partes iguais e toda thread conclui a sua, em todos os casos, então
+as barras sairiam idênticas. A coluna existe como evidência dessa premissa, que é
+o que sustenta toda comparação de tempo.
 
 ### Por que dois gráficos de perda
 
@@ -308,8 +311,10 @@ passa por `paraNumero()` em [src/db.ts](src/db.ts).
   gráficos por caso;
 - nenhum caso aborta o benchmark: uma repetição que estoura vira uma linha com
   `falhou=sim` e o erro na coluna ao lado;
-- a série temporal só é gravada da primeira repetição, senão o CSV cresce sem
-  acrescentar nada ao gráfico.
+- a série temporal só é gravada da primeira repetição, e só nos pontos em que o
+  total observado mudou. O observador lê tão rápido quanto o Postgres responde e
+  97% das amostras repetem a anterior, que numa linha `step-after` não desenham
+  nada. A compressão tira meio megabyte do CSV e produz a mesma figura.
 
 ---
 
@@ -321,6 +326,7 @@ package.json
 tsconfig.json                       strict ligado
 .env.example
 README.md
+slides.pdf                          a apresentação do trabalho
 src/ambiente.ts                     a máquina e a varredura de threads
 src/db.ts                           pool, seed, invariante, classificação de erro
 src/tipos.ts                        ResultadoCaso, Invariante, OpcoesCaso
@@ -336,6 +342,10 @@ src/benchmark.ts                    a medição
 src/charts.ts                       os gráficos e o relatório HTML
 resultados/                         CSV, SVG e relatorio.html gerados
 ```
+
+Tudo em `resultados/` é gerado por `npm run bench` e `npm run charts`, e mesmo
+assim fica versionado: os números não são determinísticos, então o que está no
+repositório é a medição que o README cita e que a apresentação usa.
 
 ### Como os workers recebem parâmetros e devolvem resultado
 
