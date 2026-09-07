@@ -1,29 +1,30 @@
-# Concorrência e threads: um catálogo de bugs
+# Concorrência com worker_threads: o que muda com o número de threads
 
-Projeto didático em TypeScript + Node.js + PostgreSQL para uma apresentação sobre
-concorrência e threads.
+Projeto didático em TypeScript + Node.js + PostgreSQL. Seis casos de uso rodam
+sob uma varredura de números de threads, dez repetições cada, e o resultado sai
+em gráficos comparativos: **quanto dinheiro se perde** e **quanto tempo se leva**,
+por caso e por número de threads.
 
-O objetivo aqui é **demonstrar problemas, não resolvê-los**. Os bugs são o
-produto. Cada trecho problemático está marcado no código com
-`// BUG INTENCIONAL: <explicação>`, e não existe mutex, `Atomics.wait`, fila de
-serialização, `SELECT ... FOR UPDATE`, `UPDATE saldo = saldo - x`, isolamento
-`SERIALIZABLE` nem retry em lugar nenhum. A única exceção é o cenário 1, que é o
-baseline correto e serve de régua para todos os outros.
+O objetivo é **demonstrar problemas, não resolvê-los**. Os bugs são o produto.
+Cada trecho problemático está marcado no código com
+`// BUG INTENCIONAL: <explicação>`, e não existe mutex, `Atomics.add`,
+`SELECT ... FOR UPDATE`, `UPDATE saldo = saldo - x`, isolamento `SERIALIZABLE`
+nem retry em lugar nenhum. A única exceção é o caso 01, que é o baseline correto
+e serve de régua para os outros.
 
-A apresentação tem dois blocos, e o contraste entre eles é a tese:
+O produto do projeto são os arquivos em `resultados/`. Nenhum caso imprime
+demonstração no terminal: o que aparece na tela é o andamento da medição.
 
-| Bloco | O que é | Cenários |
-|---|---|---|
-| **A** | concorrência sem thread nenhuma (event loop, async/await) | 1 a 5 |
-| **B** | paralelismo real com `worker_threads` | 6 a 11 |
+**As duas perguntas que os gráficos respondem:**
 
-**A maioria dos bugs que as pessoas atribuem a "thread" acontece com uma thread
-só.** O cenário 2 é a prova: 200 saques registrados no razão, 9 debitados de
-verdade, zero workers envolvidos.
+1. quanto se perde à medida que se adiciona thread, e o que acontece quando o
+   número de threads passa do número de threads de hardware da máquina;
+2. quanto tempo cada caso leva, e quais deles de fato ficam mais rápidos com mais
+   thread.
 
 ---
 
-## Como subir
+## Como rodar
 
 Precisa de Node 20+ e Docker.
 
@@ -31,121 +32,226 @@ Precisa de Node 20+ e Docker.
 cp .env.example .env
 npm install
 npm run db:up
-npm run db:reset
 ```
 
-O `db:up` sobe um Postgres 17 na porta **5433** (para não brigar com um Postgres
-já instalado na máquina) e espera ficar saudável. O `db:reset` cria as tabelas e
-semeia as contas.
-
-Se o banco estiver fora do ar, qualquer cenário falha com uma mensagem clara em
-vez de despejar um `ECONNREFUSED`:
-
-```
-[ERRO] Nao consegui falar com o Postgres em localhost:5433/banco.
-       O banco esta fora do ar. Suba com:  npm run db:up
-```
-
-Para derrubar tudo no fim: `npm run db:down`.
-
-## Como rodar um cenário isolado
-
-Cada cenário roda sozinho, imprime o próprio resumo e não depende do runner:
+A medição inteira, e depois os gráficos:
 
 ```bash
-npx tsx src/cenarios/02-corrida-sem-thread.ts
+npm run bench -- --repetitions 10 2>/dev/null
 ```
 
-Ou pelos atalhos do npm, de `c01` a `c11`:
-
 ```bash
-npm run c02
-```
-
-Os parâmetros vêm do `.env` e podem ser sobrescritos na chamada:
-
-```bash
-CONCORRENCIA=64 OPERACOES=500 npm run c02
-```
-
-O cenário 11 escreve os logs de depuração em stderr, porque o barulho dele é o
-próprio experimento. Para ver só o resumo:
-
-```bash
-npm run c11 2>/dev/null
-```
-
-## Como rodar tudo
-
-Existem dois comandos, e eles servem para coisas diferentes.
-
-### Os 11 cenários na sequência, com a saída de apresentação
-
-```bash
-npm run all
-```
-
-Roda de 1 a 11 na ordem, cada um num processo separado, com a mesma saída que
-teriam se você os chamasse um a um. Leva cerca de 20 segundos no total e termina
-com uma tabela de tempo e status por cenário. É o comando para ensaiar a
-apresentação e para conferir que tudo funciona depois de um `git clone`.
-
-```bash
-npm run all -- --only 02,06,11   # só estes, por prefixo
-npm run all -- --block A         # só o bloco A (1 a 5)
-npm run all -- --block B         # só o bloco B (6 a 11)
-npm run all -- --fail-fast       # interrompe no primeiro que falhar
-npm run all 2>/dev/null          # esconde o barulho de depuração do cenário 11
-```
-
-Por padrão ele segue mesmo se um cenário falhar, e lista as falhas no resumo do
-fim. O código de saída é 1 se algum cenário falhou.
-
-### A medição, com repetições e gráficos
-
-```bash
-caffeinate -i npm run bench -- --scenarios all --repetitions 10
 npm run charts
 ```
 
-Este é o que gera os CSV e os SVG. Ao contrário do `npm run all`, ele silencia
-a saída dos cenários e mede.
+Leva cerca de dois minutos numa máquina de 10 threads. Abra
+`resultados/relatorio.html` no navegador: é a página com todos os gráficos, o
+resumo numérico e a descrição da máquina que produziu os números.
 
-Opções do runner:
+Para derrubar o banco no fim: `npm run db:down`.
+
+### Por que o `2>/dev/null`
+
+O caso 06 escreve em `stderr` **de propósito**: o custo dessa escrita é o
+experimento dele. Sem o redirecionamento, duzentas mil linhas de depuração por
+repetição afogam o terminal. O redirecionamento não barateia a escrita, só tira
+ela da tela, então a medição continua válida.
+
+### Em macOS, use `caffeinate -i`
+
+`performance.now()` conta o tempo em que a máquina esteve suspensa, então um
+notebook que dorme no meio da execução produz repetições que não medem nada:
+
+```bash
+caffeinate -i npm run bench -- --repetitions 10 2>/dev/null
+```
+
+### Opções da medição
 
 | Opção | Padrão | O que faz |
 |---|---|---|
-| `--scenarios` | `all` | lista separada por vírgula, ou `all`, `A`, `B`. Aceita prefixo: `--scenarios 02,08` |
-| `--concurrency` | o que cada cenário define | ex: `1,2,4,8,16,32,64` |
+| `--cases` | `all` | lista por vírgula, aceita prefixo: `--cases 03,04` |
+| `--threads` | derivado da máquina | ex: `1,2,4,8,16` |
 | `--repetitions` | `10` | uma linha no CSV por repetição, nunca só a média |
-| `--operations` | por cenário | número de saques; cenários de CPU e de memória ignoram, porque a escala deles é outra |
+| `--operations` | por caso | carga total por repetição; casos de CPU e de memória ignoram, porque a escala deles é outra |
 | `--no-warmup` | desligado | não descarta a primeira execução de cada série |
 | `--output` | `resultados` | diretório de saída |
 
-O runner descarta uma execução de warm-up antes de cada série, recria o estado do
-banco antes de **cada** repetição, e nenhum cenário aborta o benchmark: uma
-repetição que estoura vira uma linha com `falhou=sim` e o erro na coluna ao lado.
+---
 
-**Em macOS, rode com `caffeinate -i`.** `performance.now()` conta o tempo em que a
-máquina esteve suspensa, então um notebook que dorme no meio da execução produz
-repetições de vinte minutos que não medem nada:
+## A varredura de threads, e a régua da máquina
 
-```bash
-caffeinate -i npm run bench -- --scenarios all --repetitions 10
-```
+O eixo x de quase todo gráfico é o número de threads de trabalho. Uma curva de
+threads sem saber quantas threads a máquina tem não quer dizer nada: o ponto em
+que a curva para de melhorar é o limite de paralelismo do hardware, e ele muda de
+máquina para máquina.
 
-### O que é gerado em `resultados/`
+Por isso a varredura é **derivada da máquina** por
+`os.availableParallelism()`, em [src/ambiente.ts](src/ambiente.ts): potências de
+dois até o dobro do que a máquina tem, mais o próprio número e o dobro dele. Numa
+máquina de 10 threads sai `1, 2, 4, 8, 10, 16, 20`. São pontos antes do limite, o
+limite exato, e dois pontos depois dele.
+
+O mesmo módulo grava `resultados/ambiente.json` com CPU, número de threads de
+hardware, memória, versão do Node e horário da medição. Os gráficos leem esse
+arquivo e desenham uma **régua vermelha vertical** no número de threads da
+máquina. Passado ela, mais worker não é mais núcleo: é revezamento.
+
+Os números citados neste README foram medidos num **Apple M4 de 10 threads**, com
+Postgres 17 em container local. Rode na sua máquina antes de citar qualquer um
+deles: bug de corrida não é determinístico, e o limite de hardware é outro.
+
+---
+
+## Os seis casos
+
+Todos dividem uma carga **total fixa** entre as threads. Não é detalhe: se cada
+thread recebesse uma carga fixa, o trabalho total cresceria junto com o número de
+threads e nem a curva de tempo nem a de perda diriam nada sobre paralelismo.
+
+| # | Caso | Estado compartilhado | Perde dinheiro? |
+|---|---|---|---|
+| 01 | [baseline sequencial](src/casos/01-baseline-sequencial.ts) | nenhum (thread única) | não, por construção |
+| 02 | [CPU entre threads](src/casos/02-worker-cpu.ts) | nenhum | não |
+| 03 | [corrida em SharedArrayBuffer](src/casos/03-worker-sab-corrida.ts) | um `Int32Array` | muito |
+| 04 | [corrida no banco](src/casos/04-worker-banco.ts) | uma linha do Postgres | muito |
+| 05 | [leitura suja](src/casos/05-worker-leitura-suja.ts) | nenhum (par de contas por thread) | não, mas o relatório mente |
+| 06 | [heisenbug](src/casos/06-worker-heisenbug.ts) | um `Int32Array` | depende do observador |
+
+### 01 — baseline sequencial
+
+Um saque por vez, em laço, na thread principal: `SELECT`, cálculo em JS,
+`UPDATE`. Nenhum worker sobe aqui. Roda só com uma thread, e ignora a varredura:
+a ideia de "mais threads" não se aplica a um laço que espera cada operação
+terminar antes de começar a próxima.
+
+Existe por dois motivos. Prova que a lógica do saque está certa, porque a
+divergência fecha em zero e cada `SELECT` já enxerga o `UPDATE` anterior. E dá o
+ponto de referência de tempo: **98 ms** para 200 saques, a linha tracejada azul do
+gráfico de tempo, contra a qual o caso 04 deve ser lido.
+
+### 02 — trabalho de CPU dividido entre threads
+
+O caso em que thread entrega exatamente o que promete. Um laço de mistura de
+inteiros, puro CPU, dividido em partes iguais entre N workers. Nenhum estado
+compartilhado, nenhum banco: cada thread recebe um pedaço, calcula sozinha e
+devolve um número.
+
+O tempo cai de **1060 ms com uma thread para 223 ms com dez**, um ganho de 4,8x,
+e a partir daí **piora**: 263 ms com 16 threads, 298 ms com 20. O fundo da curva
+cai exatamente sobre a régua da máquina. Perda de dinheiro: zero, em qualquer
+número de threads, e esse zero é o resultado, não a ausência dele. Separar o
+trabalho é o que torna paralelismo seguro.
+
+O trabalho é aritmética de inteiros pura, sem alocar um byte
+([src/hash.ts](src/hash.ts)). Com `crypto.createHash`, as threads disputariam o
+alocador do OpenSSL e a curva ficaria achatada por um motivo que não tem nada a
+ver com paralelismo.
+
+### 03 — lost update em memória compartilhada
+
+N workers, cada um numa thread do sistema operacional, incrementando o **mesmo**
+`Int32Array` sobre um `SharedArrayBuffer`, sem `Atomics`.
+
+`contador[0] = contador[0] + 1` são três operações de máquina: carrega da
+memória, soma, escreve de volta. Dois núcleos que carregam o mesmo valor ao mesmo
+tempo escrevem o mesmo resultado, e um dos dois incrementos evapora.
+
+É a curva de perda mais limpa do projeto: **zero com uma thread, 48% com duas,
+73% com quatro**, e daí para cima entre 45% e 64%. Uma thread não perde nada
+porque não há com quem disputar; a partir de duas, a perda é imediata.
+
+### 04 — lost update no banco
+
+O mesmo saque do caso 01, agora executado por N workers ao mesmo tempo na mesma
+conta, cada um com o próprio `Pool`. A janela perigosa é entre o `SELECT` e o
+`UPDATE`: nesse intervalo outra thread já leu o mesmo saldo velho, e a segunda
+gravação apaga a primeira.
+
+**Zero perdido com uma thread, 38% com duas, 67% com dez.** O razão registra os
+200 saques, a conta debita uma fração deles, e a diferença é o dinheiro que soma
+nenhuma auditoria explica.
+
+A curva de tempo é o contraponto do caso 02: melhora de 164 ms para 133 ms com
+duas threads e depois só piora, chegando a 442 ms com 20. Não é trabalho de CPU,
+é disputa pela mesma linha, e disputa não paraleliza.
+
+### 05 — o relatório que lê o meio da transferência
+
+N workers transferem dinheiro entre pares de contas **sem transação**, enquanto a
+thread principal roda `SELECT SUM(saldo)` em laço, como faria um dashboard.
+
+Cada thread recebe o próprio par de contas, então não há disputa por linha e no
+fim **nada se perde**: a divergência fecha em zero em qualquer número de threads.
+Mesmo assim o total lido balança, porque entre o débito de uma conta e o crédito
+da outra existe um instante em que o dinheiro não está em lugar nenhum.
+
+O buraco cresce com o número de threads, e cresce de forma quase exata: cada
+transferência no ar esconde 100 unidades, então o menor total observado cai 100
+com uma thread, 400 com quatro, 900 com dez e 1500 com vinte. O gráfico da série
+mostra isso como degraus cada vez mais fundos e mais frequentes.
+
+Um número pode estar errado sem que nenhum dado esteja errado. O erro está em ter
+lido no meio de uma operação que ainda não acabou.
+
+O seed deste caso é dimensionado pelo **maior** número de threads da varredura, e
+não pelo da execução: assim todos os pontos medem o mesmo sistema, com o mesmo
+total de dinheiro, e as séries temporais podem ser postas no mesmo gráfico.
+
+### 06 — o heisenbug
+
+O caso 03 inteiro, com uma única diferença: uma flag que insere um `console.error`
+dentro da seção crítica, entre ler e escrever o `Int32Array`. O benchmark roda os
+dois lados da varredura inteira, e eles entram nos gráficos como casos distintos.
+
+Reaproveitar o `executar` do caso 03 não é economia de código: é a garantia de
+que a única variável entre as duas curvas é a linha de log.
+
+Abaixo do limite da máquina o log **esconde** o bug: com duas threads a perda cai
+de 29% para 2,4%, com quatro cai de 17% para 9,2%. A partir de oito threads a
+comparação se inverte e as duas curvas passam a se cruzar, dentro de um desvio
+padrão que é da ordem da própria diferença.
+
+O log não corrige nada, só muda o tempo. E como a corrida depende de duas threads
+caírem na mesma janela, mudar o tempo muda a frequência com que ela acontece: a
+janela entre ler e escrever uma posição de memória é de nanossegundos, e uma
+escrita em `stderr` custa microssegundos.
+
+A conclusão não é "log esconde bug". É que o efeito de um print depende do
+tamanho dele perto da janela da corrida e do que mais está disputando a CPU. Como
+ninguém sabe de cabeça nenhuma dessas duas coisas, um print nunca é prova de
+nada.
+
+---
+
+## O que é gerado em `resultados/`
 
 | Arquivo | Conteúdo |
 |---|---|
-| `resultados.csv` | uma linha por repetição, com tempo, throughput, invariante, erros por SQLSTATE, operações por trabalhador e maior lacuna do event loop |
-| `distribuicao.csv` | operações concluídas por trabalhador, uma linha por trabalhador por repetição |
-| `serie-leitura-suja.csv` | série temporal do `SELECT SUM(saldo)` do cenário 10 |
-| `throughput-x-concorrencia.svg` | throughput por concorrência, uma linha por cenário |
-| `dinheiro-perdido-x-concorrencia.svg` | dinheiro perdido por concorrência, com cada repetição visível como ponto |
-| `distribuicao-por-trabalhador.svg` | distribuição de operações por trabalhador |
-| `cpu-loop-vs-workers.svg` | tempo por número de workers, event loop único contra `worker_threads` |
-| `serie-leitura-suja.svg` | série temporal do total observado durante as transferências |
+| `relatorio.html` | **a página de entrega**: todos os gráficos, a máquina e o resumo numérico |
+| `perdido-x-threads-por-caso.svg` | dinheiro perdido por número de threads, um painel por caso, com cada repetição visível |
+| `perdido-x-threads-comparado.svg` | a mesma perda como percentual do movimentado, todos os casos no mesmo eixo |
+| `tempo-x-threads-comparado.svg` | tempo por número de threads, todos os casos, escala log |
+| `tempo-x-threads-por-caso.svg` | o mesmo tempo, um painel por caso, com a dispersão entre repetições |
+| `ganho-x-threads.svg` | tempo com 1 thread / tempo com N threads, contra o ganho ideal |
+| `serie-leitura-suja.svg` | desvio do total lido durante as transferências do caso 05 |
+| `ambiente.json` | CPU, threads de hardware, memória, Node, horário |
+| `resultados.csv` | uma linha por repetição |
+| `resumo.csv` | média e desvio padrão por caso e número de threads |
+| `distribuicao.csv` | operações concluídas por thread |
+
+`distribuicao.csv` não vira gráfico: a carga é dividida em partes iguais e toda
+thread conclui a sua, em todos os casos, então as barras sairiam idênticas. O
+arquivo continua sendo gravado como evidência dessa premissa, que é o que
+sustenta toda comparação de tempo.
+
+### Por que dois gráficos de perda
+
+Os casos perdem em unidades incomparáveis: o caso 03 perde milhões de
+incrementos, o caso 04 perde algumas centenas de unidades de saldo. O gráfico por
+caso usa valor absoluto com escala de y própria por painel; o comparado usa
+`perdido / total movimentado`, que é a única forma honesta de pôr os dois no
+mesmo eixo.
 
 ---
 
@@ -167,16 +273,16 @@ esperado    = saldo_inicial + SUM(movimentos.valor)
 divergência = observado - esperado
 ```
 
-O motivo é que um saque diminui a soma dos saldos de propósito, então comparar o
-total final com o total inicial cru acusaria perda onde não houve. A tabela
-`movimentos` registra tudo o que o banco de fato movimentou, e a pergunta passa a
-ser: *o saldo das contas bate com o que o razão diz que aconteceu?*
+Um saque diminui a soma dos saldos de propósito, então comparar o total final com
+o total inicial cru acusaria perda onde não houve. A tabela `movimentos` registra
+tudo o que o banco de fato movimentou, e a pergunta passa a ser: *o saldo das
+contas bate com o que o razão diz que aconteceu?*
 
-A fórmula serve para os três formatos de cenário. Num saque, cada operação grava
-um movimento negativo e o esperado cai junto. Numa transferência, grava um
-negativo e um positivo, que se anulam. No contador em memória do cenário 6, os
-"movimentos" são os incrementos que os workers dizem ter feito e o "observado" é
-o valor final do `Int32Array`.
+A fórmula serve para os três formatos de caso. Num saque, cada operação grava um
+movimento negativo e o esperado cai junto. Numa transferência, grava um negativo e
+um positivo, que se anulam. No contador em memória dos casos 03 e 06, os
+"movimentos" são os incrementos que as threads dizem ter feito e o "observado" é o
+valor final do `Int32Array`.
 
 O sinal da divergência tem significado:
 
@@ -187,144 +293,23 @@ O sinal da divergência tem significado:
 
 O driver `pg` devolve `NUMERIC` como **string**, não como número. Ele faz isso de
 propósito: `NUMERIC(12,2)` do Postgres tem precisão maior que o `double` do JS, e
-converter sozinho perderia informação. O efeito prático é que `"500" - 1` dá
-`499` por coerção, mas `"500" + 1` dá `"5001"`. Toda leitura de saldo neste
-projeto passa por `paraNumero()` em [src/db.ts](src/db.ts), e isso está comentado
-no código porque vale mencionar na apresentação.
+converter sozinho perderia informação. O efeito prático é que `"500" - 1` dá `499`
+por coerção, mas `"500" + 1` dá `"5001"`. Toda leitura de saldo neste projeto
+passa por `paraNumero()` em [src/db.ts](src/db.ts).
 
 ---
 
-## O que cada cenário demonstra
+## Regras da medição
 
-### Bloco A: concorrência sem thread nenhuma
-
-**1. sequencial** ([src/cenarios/01-sequencial.ts](src/cenarios/01-sequencial.ts))
-
-Um `await` por vez, em laço. É o único cenário sem bug, e existe para provar duas
-coisas: que a lógica do saque está correta, e qual é o throughput de referência.
-Todo desvio que aparecer nos outros cenários vem de como o saque foi orquestrado,
-não do saque em si. A divergência fecha em zero porque cada `SELECT` já enxerga o
-`UPDATE` anterior. Guarde este número: ele é o teto do cenário 5 e o piso dos
-demais.
-
-**2. corrida sem thread** ([src/cenarios/02-corrida-sem-thread.ts](src/cenarios/02-corrida-sem-thread.ts))
-
-O cenário mais importante do projeto. A função de saque é **idêntica** à do
-cenário 1, byte por byte: `SELECT`, cálculo em JS, `UPDATE`. A única mudança é
-que várias chamadas correm ao mesmo tempo via `Promise.all`. Não há
-`worker_thread`, não há paralelismo de verdade, o processo tem **uma** thread de
-JavaScript. E o dinheiro some. A janela de perigo é o `await` do meio: entre ler
-o saldo e gravar o novo saldo o event loop entrega o controle para outra promise,
-que lê o mesmo saldo velho, e a segunda gravação apaga a primeira. Na máquina
-onde foi medido, com 32 promises e 200 saques, o razão registrou 200 saques e a
-conta debitou 9. Repare também que o mesmo arquivo tem um `restantes--` que **não**
-tem corrida, porque não atravessa nenhum `await`: a diferença entre os dois é a
-aula inteira.
-
-**3. promise órfã** ([src/cenarios/03-promise-orfa.ts](src/cenarios/03-promise-orfa.ts))
-
-Duas formas de perder o controle do fluxo sem nenhum erro aparente. Na primeira,
-`Array.prototype.forEach` recebe um callback `async`, ignora a promise que ele
-devolve e retorna na hora: o `"tudo pronto"` sai em 0,08 ms com **zero** saques
-concluídos, o último só termina 800 ms depois, o processo encerra com exit code 0
-e o erro que aconteceu dentro do callback morre num `catch` vazio. Na segunda,
-`Promise.allSettled` espera de verdade, mas o relatório conta o tamanho do array
-em vez dos `fulfilled`, e como `allSettled` nunca rejeita, ele sempre diz 100% de
-sucesso. Onze operações, dez deram certo, o relatório diz onze.
-
-**4. event loop travado** ([src/cenarios/04-event-loop-travado.ts](src/cenarios/04-event-loop-travado.ts))
-
-Um `setInterval` bate um heartbeat a cada 100 ms enquanto um handler `async` roda
-um laço apertado de CPU. A palavra `async` não cria thread nenhuma e não devolve
-o controle ao loop: ela só promete que a função **pode** ceder num `await`, e não
-há `await` nenhum dentro do laço. O heartbeat simplesmente para de bater. Na
-medição, a maior lacuna foi de 1894 ms e 17 batidas nunca saíram. É o que
-acontece com um servidor HTTP quando alguém coloca processamento pesado numa
-rota: não é um pedido lento, são todos os pedidos parados.
-
-**5. conexão compartilhada** ([src/cenarios/05-conexao-compartilhada.ts](src/cenarios/05-conexao-compartilhada.ts))
-
-Todas as operações usam o mesmo `Client` do `pg` em vez de um `Pool`. O efeito
-não é corrupção, é serialização: o driver mantém uma fila interna por conexão e
-só manda a próxima query depois que a anterior respondeu. As 32 promises
-"concorrentes" viram uma fila única e o throughput desaba, 12,8x mais lento que a
-mesma carga num `Pool`. O detalhe que costuma surpreender é que **a corrida do
-cenário 2 continua acontecendo**: o driver serializa as queries, não as
-transações, então a ordem vira `SELECT-A, SELECT-B, UPDATE-A, UPDATE-B` e os dois
-leem o mesmo saldo velho do mesmo jeito. Perde-se o desempenho e não se ganha a
-correção. O cenário usa uma latência simulada de 2 ms por query
-(`LATENCIA_DE_REDE_MS`), porque com o Postgres em loopback cada query responde em
-0,15 ms e o gargalo vira a CPU do próprio Node, o que esconde o efeito.
-
-### Bloco B: paralelismo real com worker_threads
-
-**6. corrida em memória com SharedArrayBuffer** ([src/cenarios/06-worker-sab-corrida.ts](src/cenarios/06-worker-sab-corrida.ts))
-
-Agora há paralelismo de verdade: N workers, cada um numa thread do sistema
-operacional, incrementando o mesmo `Int32Array` sobre um `SharedArrayBuffer`, sem
-`Atomics` e sem banco de dados nenhum. `contador[0] = contador[0] + 1` são três
-operações de máquina, e dois núcleos que carregam o mesmo valor ao mesmo tempo
-escrevem o mesmo resultado, evaporando um dos incrementos. Com 4 workers e 2
-milhões de incrementos cada, de 68% a 74% dos incrementos somem, e o número muda
-a cada execução. O contraste com o cenário 2 é a tese: lá o intervalo perigoso
-era um `await`, aqui é uma instrução de máquina, e o bug é o mesmo lost update.
-
-**7. o mesmo trabalho em workers** ([src/cenarios/07-worker-cpu.ts](src/cenarios/07-worker-cpu.ts))
-
-Pega o laço de CPU do cenário 4 e distribui entre N workers. Duas coisas mudam de
-uma vez: o tempo **cai** conforme se adiciona worker (5,3x mais rápido com 8
-workers na máquina medida), e o heartbeat do event loop principal continua batendo
-em 101 ms, porque a thread principal não está fazendo conta nenhuma, só esperando
-mensagem. É o contraponto exato do cenário 4, e a lição é que `async/await` serve
-para esperar I/O enquanto `worker_threads` serve para gastar CPU: trocar um pelo
-outro não resolve nada. O trabalho é aritmética de inteiros pura, sem alocação,
-porque a versão com `crypto.createHash` fazia os workers disputarem o alocador e
-achatava a curva por um motivo que não tem nada a ver com o assunto da aula.
-
-**8. a mesma corrida com paralelismo real** ([src/cenarios/08-worker-banco.ts](src/cenarios/08-worker-banco.ts))
-
-N workers, cada um com o **próprio** `Pool`, fazendo saques read-modify-write na
-mesma conta. É o cenário 2 com threads de verdade no lugar das promises, e ele
-roda os dois lado a lado no mesmo comando. O ponto não é que fica pior, é que
-fica **diferente**: na medição, 8 workers perderam 159 contra 165 das promises,
-com throughput 4x menor por causa do custo de subir worker. Os dois perdem
-dinheiro porque o bug nunca foi da thread, foi do read-modify-write.
-
-**9. deadlock** ([src/cenarios/09-deadlock.ts](src/cenarios/09-deadlock.ts))
-
-Metade dos workers transfere da conta A para a B, a outra metade da B para a A, ao
-mesmo tempo. Não existe mutex, semáforo nem `LOCK TABLE` em lugar nenhum do
-código: quem trava é o `UPDATE`, porque no Postgres um `UPDATE` segura a linha
-até o `COMMIT`. A transação que vai de A para B trava A e quer B, a que vai de B
-para A trava B e quer A, e o Postgres detecta o ciclo e mata uma delas com
-`SQLSTATE 40P01`. Na medição, 67 de 80 transferências morreram assim. O erro é
-capturado, classificado e contado, e não há retry: retry seria a correção.
-
-**10. leitura suja** ([src/cenarios/10-leitura-suja.ts](src/cenarios/10-leitura-suja.ts))
-
-Workers transferem dinheiro entre pares de contas **sem transação**, enquanto a
-thread principal roda `SELECT SUM(saldo)` em laço, como faria um dashboard. Cada
-worker tem o próprio par de contas, então não há disputa por linha e no fim nada
-se perde: a divergência fecha em zero exato. Mesmo assim, 92,6% das amostras
-mostraram um total que nunca foi verdade, com buracos de até 500, porque entre o
-débito de uma conta e o crédito da outra existe um instante em que o dinheiro não
-está em lugar nenhum. Um número pode estar errado sem que nenhum dado esteja
-errado: o erro está em ter lido no meio de uma operação que ainda não acabou.
-
-**11. heisenbug** ([src/cenarios/11-heisenbug.ts](src/cenarios/11-heisenbug.ts))
-
-O cenário 2 com uma flag que insere um `console.log` dentro da seção crítica. O
-log não corrige nada, só muda o tempo, e como o bug depende de duas operações
-caírem na mesma janela, mudar o tempo muda a frequência com que ele aparece. O
-cenário **mede em dois lugares** em vez de afirmar o resultado, e a resposta é
-diferente em cada um. No banco, a janela entre o `SELECT` e o `UPDATE` é uma ida
-e volta ao Postgres, algo como 300 µs, e um `console.log` custa poucos µs: a
-perturbação é 1% da janela e a perda não muda nada (fator 1,01x). Em memória, a
-janela entre ler e escrever o `Int32Array` é de nanossegundos, o mesmo log é mil
-vezes maior que ela, e a perda cai de 26% para 5% (fator 0,19x), ficando também
-muito mais estável. A conclusão não é "log esconde bug", é que o log esconde o bug
-quando é grande perto da janela da corrida e não faz nada quando é pequeno. Como
-ninguém sabe de cabeça o tamanho da janela, um print nunca é prova de nada.
+- uma execução de warm-up é descartada antes de cada série;
+- o estado do banco é recriado antes de **cada** repetição;
+- grava uma linha por repetição, nunca só a média: a dispersão entre repetições é
+  metade do que este projeto mostra, e por isso ela aparece como pontos nos
+  gráficos por caso;
+- nenhum caso aborta o benchmark: uma repetição que estoura vira uma linha com
+  `falhou=sim` e o erro na coluna ao lado;
+- a série temporal só é gravada da primeira repetição, senão o CSV cresce sem
+  acrescentar nada ao gráfico.
 
 ---
 
@@ -333,40 +318,37 @@ ninguém sabe de cabeça o tamanho da janela, um print nunca é prova de nada.
 ```
 docker-compose.yml
 package.json
-tsconfig.json                 strict ligado
+tsconfig.json                       strict ligado
 .env.example
 README.md
-src/db.ts                     pool, seed, invariante, classificação de erro
-src/tipos.ts                  ResultadoCenario, Invariante, OpcoesCenario
-src/relatorio.ts              resumo legível no terminal
-src/hash.ts                   o trabalho de CPU dos cenários 4 e 7
-src/heartbeat.ts              o heartbeat dos cenários 4 e 7
-src/cenarios/01..11
-src/workers/protocolo.ts      workerData na entrada, postMessage na saída
-src/workers/sab-worker.ts
+src/ambiente.ts                     a máquina e a varredura de threads
+src/db.ts                           pool, seed, invariante, classificação de erro
+src/tipos.ts                        ResultadoCaso, Invariante, OpcoesCaso
+src/relatorio.ts                    saída de terminal do benchmark
+src/hash.ts                         o trabalho de CPU do caso 02
+src/casos/01..06
+src/workers/protocolo.ts            workerData na entrada, postMessage na saída
 src/workers/cpu-worker.ts
+src/workers/sab-worker.ts
 src/workers/banco-worker.ts
-src/workers/deadlock-worker.ts
 src/workers/transferencia-worker.ts
-src/all.ts                  roda os 11 cenários na sequência
-src/benchmark.ts
-src/charts.ts
-resultados/                   CSV e SVG gerados
-slides/notas.md
+src/benchmark.ts                    a medição
+src/charts.ts                       os gráficos e o relatório HTML
+resultados/                         CSV, SVG e relatorio.html gerados
 ```
 
 ### Como os workers recebem parâmetros e devolvem resultado
 
 Entrada por `workerData`, saída por `parentPort.postMessage`. O pai também espera
-o evento `exit`, então um worker que morre antes de responder vira um resultado
+o evento `exit`, então uma thread que morre antes de responder vira um resultado
 `{ ok: false }` em vez de derrubar o benchmark: a promise nunca rejeita.
 
 ```ts
 interface EntradaWorker<P> {
-  id: number;                 // índice, usado na distribuição por trabalhador
+  id: number;                 // índice, usado na distribuição por thread
   config: Config;             // o worker abre o PRÓPRIO Pool a partir daqui
   params: P;
-  sab?: SharedArrayBuffer;    // só nos cenários que precisam
+  sab?: SharedArrayBuffer;    // só nos casos 03 e 06
 }
 
 type SaidaWorker<R> =
@@ -374,26 +356,23 @@ type SaidaWorker<R> =
   | { ok: false; id: number; erro: { sqlstate: string; mensagem: string } };
 ```
 
-Cada worker abre o próprio `Pool`. A única exceção é o cenário 5, e lá isso é o
-bug.
-
 ### Tratamento de erro
 
 Todo erro de banco é capturado e classificado por `SQLSTATE` pela classe
 `ContadorDeErros`. Erros que não vêm do Postgres recebem um pseudo-código em
 maiúsculas (`ECONNREFUSED`, `JS`, `WORKER_SEM_RESPOSTA`, `DESCONHECIDO`) para
-caberem na mesma contagem. Nenhum cenário aborta o benchmark inteiro.
+caberem na mesma contagem.
 
 ## Configuração
 
-Tudo por variável de ambiente, com `.env.example` versionado:
+Tudo por variável de ambiente, com `.env.example` versionado. O número de threads
+**não** vem daqui: é derivado da máquina.
 
 | Variável | Padrão | O que é |
 |---|---|---|
 | `PGHOST` / `PGPORT` | `localhost` / `5433` | conexão |
 | `PGUSER` / `PGPASSWORD` / `PGDATABASE` | `demo` / `demo` / `banco` | conexão |
-| `CONTAS` | `10` | quantas contas o seed cria |
+| `CONTAS` | `10` | quantas contas o seed cria (o caso 05 semeia mais quando precisa) |
 | `SALDO_INICIAL` | `1000` | saldo de cada conta |
-| `OPERACOES` | `200` | saques por execução, quando o cenário roda sozinho |
-| `CONCORRENCIA` | `32` | promises ou workers, quando o cenário roda sozinho |
+| `OPERACOES` | `200` | carga total por repetição, dividida entre as threads |
 | `VALOR_SAQUE` | `1` | valor de cada saque |

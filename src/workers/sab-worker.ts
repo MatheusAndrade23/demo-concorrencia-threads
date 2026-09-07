@@ -1,13 +1,13 @@
 /**
- * Worker do cenário 06. Não toca no banco: só incrementa um Int32Array que vive
- * num SharedArrayBuffer compartilhado com os outros workers.
+ * Worker dos casos 03 e 06. Não toca no banco: só incrementa um Int32Array que
+ * vive num SharedArrayBuffer compartilhado com as outras threads.
  */
 import { parentPort, workerData } from 'node:worker_threads';
 import type { EntradaWorker, SaidaWorker } from './protocolo.js';
 
 export interface ParamsSab {
   iteracoes: number;
-  /** cenário 11: escreve uma linha dentro da seção crítica, a cada iteração */
+  /** caso 06: escreve uma linha dentro da seção crítica, a cada iteração */
   logNaSecaoCritica?: boolean;
 }
 export interface ResultadoSab {

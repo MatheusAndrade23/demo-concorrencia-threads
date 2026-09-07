@@ -12,10 +12,10 @@ import type { Config } from '../db.js';
 export interface EntradaWorker<P> {
   /** índice do worker, usado na distribuição de operações por trabalhador */
   id: number;
-  /** o worker abre o PRÓPRIO Pool a partir daqui (menos no cenário 05) */
+  /** o worker abre o PRÓPRIO Pool a partir daqui, quando precisa de banco */
   config: Config;
   params: P;
-  /** memória compartilhada, só nos cenários que precisam (06) */
+  /** memória compartilhada, só nos casos que precisam (03 e 06) */
   sab?: SharedArrayBuffer;
 }
 
@@ -23,7 +23,7 @@ export type SaidaWorker<R> =
   | { ok: true; id: number; resultado: R }
   | { ok: false; id: number; erro: { sqlstate: string; mensagem: string } };
 
-/** Sobe um worker por entrada e espera todos. Nunca rejeita. */
+/** Sobe uma thread por entrada e espera todas. Nunca rejeita. */
 export function rodarWorkers<P, R>(
   arquivo: string,
   entradas: EntradaWorker<P>[],
@@ -60,7 +60,7 @@ function umWorker<P, R>(url: URL, entrada: EntradaWorker<P>): Promise<SaidaWorke
   });
 }
 
-/** Ajuda os cenários a separarem o joio do trigo sem repetir o filtro. */
+/** Ajuda os casos a separarem o joio do trigo sem repetir o filtro. */
 export function separar<R>(saidas: SaidaWorker<R>[]): {
   ok: { id: number; resultado: R }[];
   falhas: { id: number; erro: { sqlstate: string; mensagem: string } }[];

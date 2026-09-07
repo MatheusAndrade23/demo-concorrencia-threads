@@ -1,6 +1,7 @@
 /**
- * Worker do cenário 07. Roda exatamente a mesma função do cenário 04, só que
- * na própria thread. Não toca no banco.
+ * Worker do caso 02. Recebe um pedaço do total de rodadas, mistura inteiros na
+ * própria thread e devolve o resultado. Não toca no banco e não compartilha
+ * memória com ninguém: é trabalho de CPU separado, do jeito que dá certo.
  */
 import { performance } from 'node:perf_hooks';
 import { parentPort, workerData } from 'node:worker_threads';

@@ -1,7 +1,7 @@
 /**
- * Worker do cenário 10. Transferências SEM transação.
+ * Worker do caso 05. Transferências SEM transação.
  *
- * Cada worker tem o próprio par de contas, então não há disputa por linha e nada
+ * Cada thread tem o próprio par de contas, então não há disputa por linha e nada
  * se perde no fim. O problema é outro: entre o débito e o crédito existe um
  * intervalo em que o dinheiro não está em conta nenhuma, e qualquer relatório
  * que passar por ali enxerga um total que nunca foi verdade.
