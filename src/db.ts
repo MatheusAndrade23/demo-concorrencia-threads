@@ -2,7 +2,7 @@
  * Pool, seed e verificação da invariante.
  *
  * Este é o único arquivo do projeto que NÃO contém bug intencional: ele é a
- * régua. Se a medição aqui estiver errada, nenhum cenário prova nada.
+ * régua. Se a medição aqui estiver errada, nenhum caso prova nada.
  */
 import 'dotenv/config';
 import pg from 'pg';
@@ -22,9 +22,8 @@ export interface Config {
   contas: number;
   /** saldo de cada conta após o seed */
   saldoInicial: number;
-  /** padrões usados quando um cenário roda sozinho */
+  /** carga padrão de cada caso, quando --operations não é passado */
   operacoes: number;
-  concorrencia: number;
   valorSaque: number;
 }
 
@@ -48,7 +47,6 @@ export function lerConfig(): Config {
     contas: numeroDoAmbiente('CONTAS', 10),
     saldoInicial: numeroDoAmbiente('SALDO_INICIAL', 1000),
     operacoes: numeroDoAmbiente('OPERACOES', 200),
-    concorrencia: numeroDoAmbiente('CONCORRENCIA', 32),
     valorSaque: numeroDoAmbiente('VALOR_SAQUE', 1),
   };
 }
@@ -56,9 +54,9 @@ export function lerConfig(): Config {
 /**
  * Cria um Pool novo.
  *
- * `max` importa: se o pool tiver menos conexões do que a concorrência pedida,
- * ele próprio enfileira as operações e a corrida do cenário 02 fica mascarada.
- * Por isso todo cenário concorrente passa max = concorrência.
+ * `max` importa: se o pool tiver menos conexões do que o número de operações em
+ * voo, ele próprio enfileira as chamadas e a corrida fica mascarada pela fila do
+ * driver em vez de aparecer no saldo.
  */
 export function criarPool(max = 10, cfg: Config = lerConfig()): Pool {
   return new pg.Pool({
@@ -74,31 +72,8 @@ export function criarPool(max = 10, cfg: Config = lerConfig()): Pool {
 }
 
 /**
- * Abre `n` conexões e devolve todas ao pool.
- *
- * Sem isto, um cenário curto paga o handshake de N conexões dentro da janela
- * medida e o Pool aparece mais lento do que é. Higiene de medição, não correção
- * de bug: o warm-up não muda em nada a corrida que os cenários demonstram.
- */
-export async function aquecerPool(pool: Pool, n: number): Promise<void> {
-  const clientes = await Promise.all(Array.from({ length: n }, () => pool.connect()));
-  for (const c of clientes) c.release();
-}
-
-/** Um Client solto, sem pool. Usado de propósito pelo cenário 05. */
-export function criarClient(cfg: Config = lerConfig()): pg.Client {
-  return new pg.Client({
-    host: cfg.host,
-    port: cfg.port,
-    user: cfg.user,
-    password: cfg.password,
-    database: cfg.database,
-  });
-}
-
-/**
  * Falha com mensagem legível em vez de despejar um ECONNREFUSED cru.
- * Encerra o processo: nenhum cenário faz sentido sem banco.
+ * Encerra o processo: nenhum caso de uso faz sentido sem banco.
  */
 export async function verificarConexao(pool: Pool): Promise<void> {
   const cfg = lerConfig();
@@ -186,17 +161,6 @@ export function paraNumero(v: string | number | null): number {
   return typeof v === 'number' ? v : Number(v);
 }
 
-export interface Conta {
-  id: number;
-  titular: string;
-  saldo: number;
-}
-
-export async function listarContas(pool: Pool): Promise<Conta[]> {
-  const { rows } = await pool.query('SELECT id, titular, saldo FROM contas ORDER BY id');
-  return rows.map((r) => ({ id: r.id, titular: r.titular, saldo: paraNumero(r.saldo) }));
-}
-
 export async function somaSaldos(pool: Pool): Promise<number> {
   const { rows } = await pool.query('SELECT COALESCE(SUM(saldo), 0) AS total FROM contas');
   return paraNumero(rows[0].total);
@@ -226,7 +190,7 @@ export async function verificarInvariante(pool: Pool, saldoInicial: number): Pro
   return montarInvariante(saldoInicial, movimentos, observado);
 }
 
-/** Mesma conta, sem banco. O cenário 06 usa isto para o contador em memória. */
+/** Mesma conta, sem banco. O caso 03 usa isto para o contador em memória. */
 export function montarInvariante(
   saldoInicial: number,
   movimentos: number,
@@ -263,7 +227,7 @@ export function classificarErro(erro: unknown): ErroClassificado {
   return { sqlstate: 'DESCONHECIDO', mensagem: String(erro) };
 }
 
-/** Acumula erros por SQLSTATE. Nenhum cenário aborta o benchmark. */
+/** Acumula erros por SQLSTATE. Nenhum caso aborta o benchmark. */
 export class ContadorDeErros {
   private readonly contagem = new Map<string, number>();
   private readonly exemplos = new Map<string, string>();

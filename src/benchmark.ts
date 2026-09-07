@@ -1,142 +1,109 @@
 /**
- * Runner de benchmark.
+ * Runner de medição.
  *
- *   npx tsx src/benchmark.ts --scenarios 02,08 --concurrency 1,2,4,8,16,32,64 \
- *                            --repetitions 10 --operations 200
+ *   npx tsx src/benchmark.ts --cases 03,04 --threads 1,2,4,8 --repetitions 10
  *
  * Regras da medição:
  *   - uma execução de warm-up é descartada antes de cada série
- *   - o estado do banco é recriado antes de CADA repetição (cada cenário chama
+ *   - o estado do banco é recriado antes de CADA repetição (cada caso chama
  *     resetar() no início do próprio executar)
  *   - grava UMA LINHA POR REPETIÇÃO em resultados/resultados.csv, nunca só a
  *     média: a dispersão entre repetições é metade do que este projeto mostra
- *   - nenhum cenário aborta o benchmark; erro vira linha com a coluna `falhou`
+ *   - nenhum caso aborta o benchmark; erro vira linha com a coluna `falhou`
+ *   - a varredura de threads é derivada da máquina, e a máquina vai junto para
+ *     resultados/ambiente.json, porque uma curva de threads sem saber quantas
+ *     threads a máquina tem não quer dizer nada
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { lerAmbiente, varreduraDeThreads } from './ambiente.js';
 import { criarPool, fecharPool, lerConfig, verificarConexao } from './db.js';
-import { ehPrincipal, secao, titulo } from './relatorio.js';
-import type { OpcoesCenario, ResultadoCenario } from './tipos.js';
+import { desvio, ehPrincipal, media, secao, titulo } from './relatorio.js';
+import type { OpcoesCaso, ResultadoCaso } from './tipos.js';
 
 interface Modulo {
-  executar: (o: OpcoesCenario) => Promise<ResultadoCenario>;
+  executar: (o: OpcoesCaso) => Promise<ResultadoCaso>;
 }
 
 interface Definicao {
+  /** prefixo usado em --cases e nome da série no CSV */
   nome: string;
-  bloco: 'A' | 'B';
+  /** uma linha, para o cabeçalho da medição e para o relatório HTML */
+  resumo: string;
   carregar: () => Promise<Modulo>;
-  /** concorrências que fazem sentido para este cenário */
-  concorrenciasPadrao: number[];
-  /** valor de `operações` quando --operations não é passado */
+  /**
+   * `'maquina'` usa a varredura derivada de os.availableParallelism().
+   * Uma lista fixa é para o caso que não escala em threads (o baseline).
+   */
+  varredura: 'maquina' | number[];
+  /** carga total por repetição, dividida entre as threads */
   operacoesPadrao: number;
   /**
    * true quando `operações` não é "número de saques" e sim outra escala
-   * (rodadas de hash, incrementos por worker). Estes ignoram --operations.
+   * (rodadas de mistura, incrementos). Estes ignoram --operations.
    */
   escalaPropria: boolean;
   valorSaque?: number;
   logNaSecaoCritica?: boolean;
 }
 
-const CENARIOS: Definicao[] = [
+const CASOS: Definicao[] = [
   {
-    nome: '01-sequencial',
-    bloco: 'A',
-    carregar: () => import('./cenarios/01-sequencial.js'),
-    concorrenciasPadrao: [1],
+    nome: '01-baseline-sequencial',
+    resumo: 'saques um a um na thread principal, sem worker nenhum',
+    carregar: () => import('./casos/01-baseline-sequencial.js'),
+    varredura: [1],
     operacoesPadrao: 200,
     escalaPropria: false,
   },
   {
-    nome: '02-corrida-sem-thread',
-    bloco: 'A',
-    carregar: () => import('./cenarios/02-corrida-sem-thread.js'),
-    concorrenciasPadrao: [1, 2, 4, 8, 16, 32, 64],
+    nome: '02-worker-cpu',
+    resumo: 'trabalho de CPU dividido entre threads, sem estado compartilhado',
+    carregar: () => import('./casos/02-worker-cpu.js'),
+    varredura: 'maquina',
+    operacoesPadrao: 400_000_000,
+    escalaPropria: true,
+  },
+  {
+    nome: '03-worker-sab-corrida',
+    resumo: 'threads incrementando o mesmo Int32Array, sem Atomics',
+    carregar: () => import('./casos/03-worker-sab-corrida.js'),
+    varredura: 'maquina',
+    operacoesPadrao: 16_000_000,
+    escalaPropria: true,
+  },
+  {
+    nome: '04-worker-banco',
+    resumo: 'threads sacando da mesma conta, read-modify-write sem lock',
+    carregar: () => import('./casos/04-worker-banco.js'),
+    varredura: 'maquina',
     operacoesPadrao: 200,
     escalaPropria: false,
   },
   {
-    nome: '03-promise-orfa',
-    bloco: 'A',
-    carregar: () => import('./cenarios/03-promise-orfa.js'),
-    concorrenciasPadrao: [1],
-    operacoesPadrao: 10,
-    escalaPropria: false,
-  },
-  {
-    nome: '04-event-loop-travado',
-    bloco: 'A',
-    carregar: () => import('./cenarios/04-event-loop-travado.js'),
-    concorrenciasPadrao: [1],
-    operacoesPadrao: 700_000_000,
-    escalaPropria: true,
-  },
-  {
-    nome: '05-conexao-compartilhada',
-    bloco: 'A',
-    carregar: () => import('./cenarios/05-conexao-compartilhada.js'),
-    concorrenciasPadrao: [1, 2, 4, 8, 16, 32],
-    operacoesPadrao: 60,
-    escalaPropria: false,
-  },
-  {
-    nome: '06-worker-sab-corrida',
-    bloco: 'B',
-    carregar: () => import('./cenarios/06-worker-sab-corrida.js'),
-    concorrenciasPadrao: [2, 4, 8],
-    operacoesPadrao: 2_000_000,
-    escalaPropria: true,
-  },
-  {
-    nome: '07-worker-cpu',
-    bloco: 'B',
-    carregar: () => import('./cenarios/07-worker-cpu.js'),
-    concorrenciasPadrao: [1, 2, 4, 8],
-    operacoesPadrao: 700_000_000,
-    escalaPropria: true,
-  },
-  {
-    nome: '08-worker-banco',
-    bloco: 'B',
-    carregar: () => import('./cenarios/08-worker-banco.js'),
-    concorrenciasPadrao: [1, 2, 4, 8, 16],
-    operacoesPadrao: 200,
-    escalaPropria: false,
-  },
-  {
-    nome: '09-deadlock',
-    bloco: 'B',
-    carregar: () => import('./cenarios/09-deadlock.js'),
-    concorrenciasPadrao: [2, 4, 8],
-    operacoesPadrao: 40,
-    escalaPropria: false,
-    valorSaque: 10,
-  },
-  {
-    nome: '10-leitura-suja',
-    bloco: 'B',
-    carregar: () => import('./cenarios/10-leitura-suja.js'),
-    concorrenciasPadrao: [2, 5],
+    nome: '05-worker-leitura-suja',
+    resumo: 'threads transferindo sem transação, com um dashboard olhando',
+    carregar: () => import('./casos/05-worker-leitura-suja.js'),
+    varredura: 'maquina',
     operacoesPadrao: 40,
     escalaPropria: false,
   },
   {
-    nome: '11-heisenbug-sem-log',
-    bloco: 'B',
-    carregar: () => import('./cenarios/11-heisenbug.js'),
-    concorrenciasPadrao: [2, 4, 8, 16, 32],
-    operacoesPadrao: 100,
-    escalaPropria: false,
+    nome: '06-worker-heisenbug-sem-log',
+    resumo: 'a corrida do caso 03 medida sem observador',
+    carregar: () => import('./casos/06-worker-heisenbug.js'),
+    varredura: 'maquina',
+    operacoesPadrao: 200_000,
+    escalaPropria: true,
     logNaSecaoCritica: false,
   },
   {
-    nome: '11-heisenbug-com-log',
-    bloco: 'B',
-    carregar: () => import('./cenarios/11-heisenbug.js'),
-    concorrenciasPadrao: [2, 4, 8, 16, 32],
-    operacoesPadrao: 100,
-    escalaPropria: false,
+    nome: '06-worker-heisenbug-com-log',
+    resumo: 'a mesma corrida com um console.error dentro da seção crítica',
+    carregar: () => import('./casos/06-worker-heisenbug.js'),
+    varredura: 'maquina',
+    operacoesPadrao: 200_000,
+    escalaPropria: true,
     logNaSecaoCritica: true,
   },
 ];
@@ -145,8 +112,8 @@ const CENARIOS: Definicao[] = [
 // argumentos
 // ---------------------------------------------------------------------------
 interface Argumentos {
-  cenarios: Definicao[];
-  concorrencia?: number[];
+  casos: Definicao[];
+  threads?: number[];
   repeticoes: number;
   operacoes?: number;
   warmup: boolean;
@@ -160,19 +127,17 @@ function listaDeNumeros(bruto: string): number[] {
     .filter((n) => Number.isFinite(n) && n > 0);
 }
 
-function selecionarCenarios(bruto: string): Definicao[] {
+function selecionarCasos(bruto: string): Definicao[] {
   const chave = bruto.trim().toLowerCase();
-  if (chave === 'all') return CENARIOS;
-  if (chave === 'a') return CENARIOS.filter((c) => c.bloco === 'A');
-  if (chave === 'b') return CENARIOS.filter((c) => c.bloco === 'B');
+  if (chave === 'all' || chave === '') return CASOS;
 
   const pedidos = chave.split(',').map((p) => p.trim());
   const escolhidos: Definicao[] = [];
   for (const pedido of pedidos) {
-    const achados = CENARIOS.filter((c) => c.nome === pedido || c.nome.startsWith(`${pedido}-`));
+    const achados = CASOS.filter((c) => c.nome === pedido || c.nome.startsWith(`${pedido}-`));
     if (achados.length === 0) {
-      console.error(`\n[ERRO] Cenário "${pedido}" não existe. Disponíveis:`);
-      for (const c of CENARIOS) console.error(`       ${c.nome}`);
+      console.error(`\n[ERRO] Caso "${pedido}" não existe. Disponíveis:`);
+      for (const c of CASOS) console.error(`       ${c.nome}`);
       process.exit(1);
     }
     escolhidos.push(...achados);
@@ -180,9 +145,26 @@ function selecionarCenarios(bruto: string): Definicao[] {
   return escolhidos;
 }
 
+const AJUDA = `
+Uso: npx tsx src/benchmark.ts [opções]
+
+  --cases LISTA        nomes separados por vírgula, ou "all". Aceita prefixo:
+                       --cases 03,04  |  --cases 06
+  --threads LISTA      ex: 1,2,4,8,16 (padrão: a varredura derivada da máquina)
+  --repetitions N      padrão 10, uma linha no CSV por repetição
+  --operations N       carga total por repetição, dividida entre as threads.
+                       Casos de CPU e de memória ignoram, porque a escala deles
+                       é outra
+  --no-warmup          não descarta a primeira execução de cada série
+  --output DIR         padrão: resultados
+
+O caso 06-com-log escreve em stderr de propósito, porque o custo dessa escrita é
+o experimento. Rode com 2>/dev/null para não afogar o terminal.
+`;
+
 function lerArgumentos(argv: string[]): Argumentos {
   const args: Argumentos = {
-    cenarios: CENARIOS,
+    casos: CASOS,
     repeticoes: 10,
     warmup: true,
     saida: 'resultados',
@@ -191,12 +173,12 @@ function lerArgumentos(argv: string[]): Argumentos {
     const chave = argv[i];
     const valor = argv[i + 1];
     switch (chave) {
-      case '--scenarios':
-        args.cenarios = selecionarCenarios(valor ?? 'all');
+      case '--cases':
+        args.casos = selecionarCasos(valor ?? 'all');
         i++;
         break;
-      case '--concurrency':
-        args.concorrencia = listaDeNumeros(valor ?? '');
+      case '--threads':
+        args.threads = listaDeNumeros(valor ?? '');
         i++;
         break;
       case '--repetitions':
@@ -230,19 +212,6 @@ function lerArgumentos(argv: string[]): Argumentos {
   return args;
 }
 
-const AJUDA = `
-Uso: npx tsx src/benchmark.ts [opções]
-
-  --scenarios LISTA    nomes separados por virgula, ou "all", "A", "B"
-                       exemplos: 02  |  02,08  |  01,02,05  |  B
-  --concurrency LISTA  ex: 1,2,4,8,16,32,64 (padrão: o que cada cenário define)
-  --repetitions N      padrão 10, uma linha no CSV por repetição
-  --operations N       número de saques por repetição; cenários de CPU e de
-                       memória ignoram, porque a escala deles e outra
-  --no-warmup          não descarta a primeira execução de cada série
-  --output DIR         padrão: resultados
-`;
-
 // ---------------------------------------------------------------------------
 // CSV
 // ---------------------------------------------------------------------------
@@ -252,9 +221,8 @@ function csv(valor: unknown): string {
 }
 
 const COLUNAS = [
-  'cenario',
-  'bloco',
-  'concorrencia',
+  'caso',
+  'threads',
   'repeticao',
   'operacoes',
   'concluidas',
@@ -266,25 +234,33 @@ const COLUNAS = [
   'observado',
   'divergencia',
   'perdido',
+  'percentual_perdido',
   'erros_total',
   'erros_por_sqlstate',
-  'ops_por_trabalhador',
-  'maior_lacuna_event_loop_ms',
+  'ops_por_thread',
   'extra',
   'falhou',
   'erro',
 ] as const;
 
-function linhaDoResultado(
-  def: Definicao,
-  repeticao: number,
-  r: ResultadoCenario,
-): string {
+/**
+ * Perda relativa ao que foi movimentado.
+ *
+ * Sem isto, comparar casos no mesmo eixo seria desonesto: o caso 03 perde
+ * milhões de incrementos e o caso 04 perde algumas centenas de unidades de
+ * saldo. O percentual põe os dois na mesma régua. Quando nada se movimentou, a
+ * perda relativa é zero por definição, e não uma divisão por zero.
+ */
+export function percentualPerdido(movimentos: number, perdido: number): number {
+  if (movimentos === 0) return 0;
+  return Number(((perdido / Math.abs(movimentos)) * 100).toFixed(4));
+}
+
+function linhaDoResultado(repeticao: number, r: ResultadoCaso): string {
   const errosTotal = Object.values(r.erros).reduce((a, b) => a + b, 0);
   return [
-    r.cenario,
-    def.bloco,
-    r.concorrencia,
+    r.caso,
+    r.threads,
     repeticao,
     r.operacoes,
     r.concluidas,
@@ -296,10 +272,10 @@ function linhaDoResultado(
     r.invariante.observado,
     r.invariante.divergencia,
     r.invariante.perdido,
+    percentualPerdido(r.invariante.movimentos, r.invariante.perdido),
     errosTotal,
     JSON.stringify(r.erros),
-    JSON.stringify(r.porTrabalhador),
-    r.maiorLacunaEventLoopMs?.toFixed(3) ?? '',
+    JSON.stringify(r.porThread),
     JSON.stringify(r.extra ?? {}),
     'nao',
     '',
@@ -308,17 +284,11 @@ function linhaDoResultado(
     .join(',');
 }
 
-function linhaDeFalha(
-  def: Definicao,
-  concorrencia: number,
-  repeticao: number,
-  erro: unknown,
-): string {
-  const vazio = COLUNAS.length - 6;
+function linhaDeFalha(def: Definicao, threads: number, repeticao: number, erro: unknown): string {
+  const vazio = COLUNAS.length - 5;
   return [
     def.nome,
-    def.bloco,
-    concorrencia,
+    threads,
     repeticao,
     ...new Array<string>(vazio).fill(''),
     'sim',
@@ -333,6 +303,7 @@ function linhaDeFalha(
 // ---------------------------------------------------------------------------
 export async function rodar(args: Argumentos): Promise<void> {
   const cfg = lerConfig();
+  const ambiente = lerAmbiente();
   const pool = criarPool(2, cfg);
   await verificarConexao(pool);
   await fecharPool(pool);
@@ -340,90 +311,133 @@ export async function rodar(args: Argumentos): Promise<void> {
   mkdirSync(args.saida, { recursive: true });
 
   const linhas: string[] = [COLUNAS.join(',')];
-  const distribuicao: string[] = ['cenario,concorrencia,repeticao,trabalhador,operacoes'];
-  const serie: string[] = ['cenario,concorrencia,repeticao,t_ms,total'];
+  const resumo: string[] = [
+    'caso,threads,repeticoes,ms_medio,ms_desvio,throughput_medio,perdido_medio,perdido_desvio,percentual_perdido_medio',
+  ];
+  const distribuicao: string[] = ['caso,threads,repeticao,thread,operacoes'];
+  const serie: string[] = ['caso,threads,repeticao,t_ms,total'];
 
   let falhas = 0;
 
-  for (const def of args.cenarios) {
+  for (const def of args.casos) {
     const modulo = await def.carregar();
-    const concorrencias = args.concorrencia ?? def.concorrenciasPadrao;
-    const operacoes = def.escalaPropria ? def.operacoesPadrao : args.operacoes ?? def.operacoesPadrao;
+    const varredura =
+      def.varredura === 'maquina'
+        ? args.threads ?? varreduraDeThreads(ambiente.threadsDaMaquina)
+        : def.varredura;
+    const operacoes = def.escalaPropria
+      ? def.operacoesPadrao
+      : args.operacoes ?? def.operacoesPadrao;
 
-    secao(`${def.nome}   bloco ${def.bloco}   operações=${operacoes.toLocaleString('pt-BR')}`);
+    secao(`${def.nome}   carga=${operacoes.toLocaleString('pt-BR')}   ${def.resumo}`);
 
-    for (const concorrencia of concorrencias) {
-      const opts: OpcoesCenario = {
+    for (const threads of varredura) {
+      const opts: OpcoesCaso = {
         operacoes,
-        concorrencia,
+        threads,
+        threadsMaximas: Math.max(...varredura),
         valorSaque: def.valorSaque ?? cfg.valorSaque,
         logNaSecaoCritica: def.logNaSecaoCritica,
-        silencioso: true,
       };
 
       if (args.warmup) {
-        process.stdout.write(`  c=${String(concorrencia).padStart(3)}  warm-up... `);
+        process.stdout.write(`  threads=${String(threads).padStart(3)}  warm-up... `);
         try {
           await modulo.executar(opts);
         } catch {
           // warm-up não entra no CSV nem interrompe nada
         }
       } else {
-        process.stdout.write(`  c=${String(concorrencia).padStart(3)}  `);
+        process.stdout.write(`  threads=${String(threads).padStart(3)}  `);
       }
 
       const tempos: number[] = [];
       const perdas: number[] = [];
+      const percentuais: number[] = [];
+      const vazoes: number[] = [];
+      let nome = def.nome;
 
       for (let rep = 1; rep <= args.repeticoes; rep++) {
         try {
           const r = await modulo.executar(opts);
-          linhas.push(linhaDoResultado(def, rep, r));
+          nome = r.caso;
+          linhas.push(linhaDoResultado(rep, r));
           tempos.push(r.ms);
           perdas.push(r.invariante.perdido);
+          percentuais.push(percentualPerdido(r.invariante.movimentos, r.invariante.perdido));
+          vazoes.push(r.throughput);
 
-          r.porTrabalhador.forEach((n, i) => {
-            distribuicao.push([r.cenario, r.concorrencia, rep, i, n].map(csv).join(','));
+          r.porThread.forEach((n, i) => {
+            distribuicao.push([r.caso, r.threads, rep, i, n].map(csv).join(','));
           });
-          for (const a of r.serie ?? []) {
-            serie.push([r.cenario, r.concorrencia, rep, a.t, a.valor].map(csv).join(','));
+          // a série temporal só da primeira repetição: as dez juntas explodiriam
+          // o CSV sem acrescentar nada ao gráfico, que mostra uma execução
+          if (rep === 1) {
+            for (const a of r.serie ?? []) {
+              serie.push([r.caso, r.threads, rep, a.t, a.valor].map(csv).join(','));
+            }
           }
           process.stdout.write('.');
         } catch (erro) {
           falhas++;
-          linhas.push(linhaDeFalha(def, concorrencia, rep, erro));
+          linhas.push(linhaDeFalha(def, threads, rep, erro));
           process.stdout.write('x');
         }
       }
 
-      const media = (v: number[]): number => (v.length === 0 ? 0 : v.reduce((a, b) => a + b, 0) / v.length);
-      const min = (v: number[]): number => (v.length === 0 ? 0 : Math.min(...v));
-      const max = (v: number[]): number => (v.length === 0 ? 0 : Math.max(...v));
+      resumo.push(
+        [
+          nome,
+          threads,
+          tempos.length,
+          media(tempos).toFixed(3),
+          desvio(tempos).toFixed(3),
+          media(vazoes).toFixed(3),
+          media(perdas).toFixed(3),
+          desvio(perdas).toFixed(3),
+          media(percentuais).toFixed(4),
+        ]
+          .map(csv)
+          .join(','),
+      );
+
       console.log(
-        `  ${media(tempos).toFixed(0).padStart(6)} ms médio   ` +
-          `perdido ${media(perdas).toFixed(1).padStart(8)} ` +
-          `(min ${min(perdas)} / max ${max(perdas)})`,
+        `  ${media(tempos).toFixed(0).padStart(7)} ms médio   ` +
+          `perdido ${media(perdas).toFixed(1).padStart(10)} ` +
+          `(${media(percentuais).toFixed(1).padStart(5)}% do movimentado)`,
       );
     }
   }
 
   writeFileSync(join(args.saida, 'resultados.csv'), linhas.join('\n') + '\n');
+  writeFileSync(join(args.saida, 'resumo.csv'), resumo.join('\n') + '\n');
   writeFileSync(join(args.saida, 'distribuicao.csv'), distribuicao.join('\n') + '\n');
   writeFileSync(join(args.saida, 'serie-leitura-suja.csv'), serie.join('\n') + '\n');
+  writeFileSync(join(args.saida, 'ambiente.json'), JSON.stringify(ambiente, null, 2) + '\n');
 
   secao('arquivos gravados');
   console.log(`  ${join(args.saida, 'resultados.csv')}          ${linhas.length - 1} linhas`);
+  console.log(`  ${join(args.saida, 'resumo.csv')}              ${resumo.length - 1} linhas`);
   console.log(`  ${join(args.saida, 'distribuicao.csv')}        ${distribuicao.length - 1} linhas`);
   console.log(`  ${join(args.saida, 'serie-leitura-suja.csv')}  ${serie.length - 1} linhas`);
-  if (falhas > 0) console.log(`\n  ${falhas} repetições falharam e estão marcadas com falhou=sim no CSV.`);
-  console.log('\n  Gere os gráficos com:  npm run charts\n');
+  console.log(`  ${join(args.saida, 'ambiente.json')}`);
+  if (falhas > 0) {
+    console.log(`\n  ${falhas} repetições falharam e estão marcadas com falhou=sim no CSV.`);
+  }
+  console.log('\n  Gere os gráficos e o relatório com:  npm run charts\n');
 }
 
 if (ehPrincipal(import.meta.url)) {
   const args = lerArgumentos(process.argv.slice(2));
-  titulo('BENCHMARK');
-  console.log(`  cenários: ${args.cenarios.map((c) => c.nome).join(', ')}`);
+  const ambiente = lerAmbiente();
+  titulo('MEDIÇÃO');
+  console.log(`  máquina: ${ambiente.modeloCpu}, ${ambiente.threadsDaMaquina} threads de hardware`);
+  console.log(`  node ${ambiente.node} em ${ambiente.plataforma}/${ambiente.arquitetura}`);
+  console.log(`  casos: ${args.casos.map((c) => c.nome).join(', ')}`);
   console.log(`  repetições: ${args.repeticoes}   warm-up: ${args.warmup ? 'sim' : 'não'}`);
-  if (args.concorrencia) console.log(`  concorrência: ${args.concorrencia.join(', ')}`);
+  console.log(
+    `  varredura de threads: ` +
+      (args.threads ?? varreduraDeThreads(ambiente.threadsDaMaquina)).join(', '),
+  );
   await rodar(args);
 }

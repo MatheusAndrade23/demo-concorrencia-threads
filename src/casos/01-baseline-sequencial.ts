@@ -1,10 +1,20 @@
 /**
- * CENÁRIO 01 - sequencial   (Bloco A)
+ * CASO 01 - baseline sequencial, sem thread nenhuma
  *
- * Baseline correto. Um await por vez, em laço. Não há bug aqui: este é o único
- * cenário que serve de referência de throughput e a prova de que a lógica do
- * saque está certa. Todo desvio que aparecer nos outros cenários vem da forma
- * como o saque foi orquestrado, não do saque em si.
+ * A régua. Um saque por vez, em laço, na thread principal: SELECT, cálculo em
+ * JS, UPDATE. Nenhum worker sobe aqui.
+ *
+ * Existe por dois motivos:
+ *
+ *   1. prova que a lógica do saque está certa. A divergência fecha em zero, e
+ *      isso significa que todo desvio que aparecer nos outros casos veio de como
+ *      o trabalho foi distribuído entre threads, e não do saque em si;
+ *   2. dá o ponto de referência de tempo. É o "quanto custaria fazer isso com
+ *      uma thread só", a linha tracejada contra a qual as curvas de tempo dos
+ *      casos com worker são lidas.
+ *
+ * Roda com `threads = 1` e ignora a varredura: a ideia de "mais threads" não se
+ * aplica a um laço que espera cada operação terminar antes de começar a próxima.
  */
 import { performance } from 'node:perf_hooks';
 import {
@@ -19,15 +29,15 @@ import {
   verificarInvariante,
 } from '../db.js';
 import type { Pool } from '../db.js';
-import { ehPrincipal, imprimirResumo, titulo } from '../relatorio.js';
-import type { OpcoesCenario, ResultadoCenario } from '../tipos.js';
+import type { OpcoesCaso, ResultadoCaso } from '../tipos.js';
 
-export const NOME = '01-sequencial';
+export const NOME = '01-baseline-sequencial';
 const CONTA_ALVO = 1;
 
 /**
- * SELECT, cálculo em JS, UPDATE. Exatamente o mesmo saque do cenário 02.
- * A única diferença entre os dois cenários é quem chama isto e como.
+ * SELECT, cálculo em JS, UPDATE. Exatamente o mesmo saque que o worker do caso
+ * 04 executa. A única diferença entre os dois casos é quem chama e quantos
+ * chamam ao mesmo tempo.
  */
 async function saque(pool: Pool, contaId: number, valor: number): Promise<void> {
   const { rows } = await pool.query('SELECT saldo FROM contas WHERE id = $1', [contaId]);
@@ -46,7 +56,7 @@ async function saque(pool: Pool, contaId: number, valor: number): Promise<void> 
   ]);
 }
 
-export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
+export async function executar(opts: OpcoesCaso): Promise<ResultadoCaso> {
   const cfg = lerConfig();
   const pool = criarPool(2, cfg);
   await verificarConexao(pool);
@@ -72,31 +82,19 @@ export async function executar(opts: OpcoesCenario): Promise<ResultadoCenario> {
   await fecharPool(pool);
 
   return {
-    cenario: NOME,
-    concorrencia: 1,
+    caso: NOME,
+    threads: 1,
     operacoes: opts.operacoes,
     concluidas,
     ms,
     throughput: (concluidas / ms) * 1000,
     invariante,
     erros: erros.porSqlstate(),
-    porTrabalhador: [concluidas],
+    porThread: [concluidas],
+    extra: {
+      workers: 0,
+      saquesEfetivados: Math.round((saldoInicial - invariante.observado) / opts.valorSaque),
+      saquesRegistrados: concluidas,
+    },
   };
-}
-
-if (ehPrincipal(import.meta.url)) {
-  const cfg = lerConfig();
-  titulo('CENÁRIO 01 - sequencial (baseline correto)');
-  console.log(`  ${cfg.operacoes} saques de ${cfg.valorSaque} na conta ${CONTA_ALVO}, um de cada vez.`);
-
-  const r = await executar({
-    operacoes: cfg.operacoes,
-    concorrencia: 1,
-    valorSaque: cfg.valorSaque,
-  });
-
-  imprimirResumo(r, [
-    'Divergência zero: cada SELECT já enxerga o UPDATE anterior.',
-    'Guarde este throughput. Ele é o teto do cenário 05 e o piso dos demais.',
-  ]);
 }

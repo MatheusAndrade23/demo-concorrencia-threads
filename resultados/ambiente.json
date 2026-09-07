@@ -1,0 +1,9 @@
+{
+  "threadsDaMaquina": 10,
+  "modeloCpu": "Apple M4",
+  "plataforma": "darwin",
+  "arquitetura": "arm64",
+  "node": "v26.8.0-alpha.0.0.0",
+  "memoriaGb": 16,
+  "medidoEm": "2026-09-07T14:03:46.567Z"
+}
